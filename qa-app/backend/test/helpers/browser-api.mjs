@@ -16,3 +16,8 @@ export const renameRelationship = () => {};
 export const requestChapterSuggestion = () => {};
 export const requestGoalSuggestion = () => {};
 export const updateRelationshipSettings = () => {};
+
+export const exportArchives = () => {};
+export const importArchives = () => {};
+export const listTrash = () => [];
+export const restoreArchive = () => {};

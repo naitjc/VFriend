@@ -4,6 +4,7 @@ const { updateStateObject, analyzeImpact, compressHistory: sharedCompressHistory
 const { buildSystemPrompt } = prompts
 import { CapacitorHttp } from '@capacitor/core'
 import { loadNativeModelSettings } from './nativeModelSettings'
+import { nativeModelRequest } from './nativeTransport'
 
 const MIN_CHAPTER_MESSAGES = 8
 const MIN_CHAPTER_CONFIDENCE = 0.78
@@ -47,31 +48,7 @@ export async function callNativeLLM(messages, options = {}) {
   const settings = await loadNativeModelSettings()
   if (!settings.apiKey) throw new Error('请先在“更多操作”中配置模型 API')
 
-  const response = await CapacitorHttp.post({
-    url: chatCompletionsURL(settings.apiURL),
-    headers: {
-      Authorization: `Bearer ${settings.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    data: {
-      model: options.model || settings.model,
-      messages,
-      stream: false,
-      temperature: clamp(options.temperature, 0, 1, 0.5),
-      top_p: clamp(options.top_p, 0.01, 1, 0.7),
-    },
-    connectTimeout: options.timeout || 90000,
-    readTimeout: options.timeout || 90000,
-    responseType: 'json',
-  })
-
-  if (response.status < 200 || response.status >= 300) {
-    const message = response.data?.error?.message || `模型请求失败（${response.status}）`
-    throw new Error(message)
-  }
-  const data = typeof response.data === 'string'
-    ? JSON.parse(response.data)
-    : response.data
+  const data = await nativeModelRequest(settings, messages, options)
   if (!data?.choices?.[0]?.message) throw new Error('模型响应格式错误')
   if (data.choices[0].finish_reason && data.choices[0].finish_reason !== 'stop') throw new Error('模型回复未完整结束，请重试；本轮状态未提交')
   return data
@@ -93,11 +70,14 @@ export async function testNativeModelConnection(settings) {
 }
 
 export async function sendNativeMessage(payload, callbacks = {}) {
+  const signal = callbacks.signal
+  const call = (messages, options = {}) => callNativeLLM(messages, { ...options, signal: options.signal || signal })
   let relationshipState = payload.characterSettings?.relationshipState || null
   const [history, impact] = await Promise.all([
-    sharedCompressHistory(callNativeLLM, payload.history, buildSystemPrompt(payload.characterSettings, payload.chatContext), payload.question),
-    analyzeImpact(callNativeLLM, payload.question, payload.characterSettings, payload.history),
+    sharedCompressHistory(call, payload.history, buildSystemPrompt(payload.characterSettings, payload.chatContext), payload.question, { signal }),
+    analyzeImpact(call, payload.question, payload.characterSettings, payload.history, { signal }),
   ])
+  if (signal?.aborted) throw new DOMException('已停止', 'AbortError')
   let stateChange = null
   if (relationshipState && impact) {
     const previous = relationshipState
@@ -114,33 +94,25 @@ export async function sendNativeMessage(payload, callbacks = {}) {
     relationshipState,
   }
   const userMessage = { role: 'user', content: payload.image ? [{ type: 'text', text: payload.question || '' }, { type: 'image_url', image_url: { url: payload.image } }] : payload.question }
-  const data = await callNativeLLM([
+  const settings = await loadNativeModelSettings()
+  if (!settings.apiKey) throw new Error('请先在“更多操作”中配置模型 API')
+  const result = await nativeModelRequest(settings, [
     { role: 'system', content: buildSystemPrompt(finalSettings, payload.chatContext) },
-    ...history,
-    userMessage,
-  ], {
-    temperature: payload.temperature,
-    top_p: payload.top_p,
-    timeout: 90000,
-  })
-  const fullText = String(data.choices[0].message.content || '')
+    ...history, userMessage,
+  ], { temperature: payload.temperature, top_p: payload.top_p, timeout: 90000, signal }, callbacks.onChunk || (() => {}))
+  const fullText = String(result.text || '')
   if (!fullText.trim()) throw new Error('模型返回了空回复，请重试')
-  const characters = Array.from(fullText)
-  for (let index = 0; index < characters.length; index += 18) {
-    callbacks.onChunk?.(characters.slice(index, index + 18).join(''))
-    await new Promise(resolve => setTimeout(resolve, 0))
+  const reply = {
+    history: [...history, userMessage, { role: 'assistant', content: fullText }],
+    relationshipState, stateChange,
   }
+  callbacks.onReply?.(reply)
   if (payload.characterSettings?.basicInfo?.name) callbacks.onProgress?.({ phase: 'organizing' })
   const continuity = payload.characterSettings?.basicInfo?.name
-    ? await updateContinuity(callNativeLLM, finalSettings.memory, payload.question, fullText, payload.chatContext?.mode)
+    ? await updateContinuity(call, finalSettings.memory, payload.question, fullText, payload.chatContext?.mode, { signal })
     : { memory: finalSettings.memory }
-  if (relationshipState) callbacks.onState?.({ relationshipState, stateChange })
-  callbacks.onDone?.({
-    history: [...history, userMessage, { role: 'assistant', content: fullText }],
-    ...continuity,
-    relationshipState,
-    stateChange,
-  })
+  if (signal?.aborted) throw new DOMException('已停止', 'AbortError')
+  callbacks.onDone?.({ ...reply, ...continuity })
 }
 
 export async function summarizeNativeChapter(history) {

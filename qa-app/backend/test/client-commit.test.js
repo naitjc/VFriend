@@ -79,3 +79,69 @@ test('send progress distinguishes replying and memory work without committing in
   assert.equal(store.sendPhase, '');
   assert.equal(store.isSending, false);
 });
+
+test('stopping retains partial text without committing state; retry replaces the same round', async () => {
+  const { store, control } = await fixture();
+  control.stream = async (_, cb) => {
+    cb.onChunk('尚未说完🌊');
+    store.stopGeneration();
+    assert.equal(cb.signal.aborted, true);
+    throw new DOMException('已停止', 'AbortError');
+  };
+  await store.sendMessage('一起看海');
+  assert.equal(store.conversationHistory.length, 2);
+  assert.equal(store.conversationHistory[1].content, '尚未说完🌊');
+  assert.equal(store.conversationHistory[1].delivery, 'stopped');
+  assert.deepEqual(store.apiHistory, []);
+  control.stream = async (payload, cb) => {
+    assert.equal(payload.question, '一起看海');
+    assert.deepEqual(payload.history, []);
+    cb.onDone({ history: [{ role: 'user', content: payload.question }, { role: 'assistant', content: '走吧' }] });
+  };
+  await store.retryMessage(1);
+  assert.equal(store.conversationHistory.length, 2);
+  assert.equal(store.conversationHistory[1].content, '走吧');
+  assert.equal(store.conversationHistory[1].delivery, 'complete');
+  assert.equal(store.retryableMessageIndex, -1);
+});
+
+test('completed reply survives interruption of optional continuity work', async () => {
+  const { store, control } = await fixture();
+  const history = [{ role: 'user', content: '你好' }, { role: 'assistant', content: '你好朋友' }];
+  control.stream = async (_, cb) => {
+    cb.onChunk('你好');
+    cb.onReply({ history, relationshipState: { affection: 12, mood: 1 } });
+    cb.onProgress({ phase: 'organizing' });
+    store.stopGeneration();
+    throw new DOMException('已停止', 'AbortError');
+  };
+  await store.sendMessage('你好');
+  assert.equal(store.conversationHistory[1].content, '你好朋友');
+  assert.equal(store.conversationHistory[1].delivery, 'complete');
+  assert.equal(store.characterSettings.relationshipState.affection, 12);
+  assert.deepEqual(store.characterSettings.memory.longTerm, ['原始事实']);
+  assert.deepEqual(control.writes.at(-1).snapshot.apiHistory, history);
+  assert.match(store.continuityWarning, /跳过/);
+});
+
+test('failed partial reply retains content and an actionable error instead of replacing the reply', async () => {
+  const { store, control } = await fixture();
+  control.stream = async (_, cb) => { cb.onChunk('这是一部分'); throw new Error('模拟断线'); };
+  await store.sendMessage('继续');
+  assert.equal(store.conversationHistory[1].content, '这是一部分');
+  assert.equal(store.conversationHistory[1].error, '模拟断线');
+  assert.equal(store.retryableMessageIndex, 1);
+  assert.deepEqual(store.apiHistory, []);
+});
+
+test('stop resolves the same request when actions receive different devtools proxy identities', async () => {
+  const { store, control } = await fixture();
+  const trackedStore = new Proxy(store, {});
+  control.stream = async (_, cb) => {
+    store.stopGeneration();
+    assert.equal(cb.signal.aborted, true);
+    throw new DOMException('已停止', 'AbortError');
+  };
+  await trackedStore.sendMessage('你好');
+  assert.equal(store.conversationHistory[1].delivery, 'stopped');
+});

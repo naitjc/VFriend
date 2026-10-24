@@ -1,3 +1,4 @@
+import archives from 'rp-archives'
 import runtimeRules from 'rp-core'
 const { initialRelationshipState } = runtimeRules
 import { CapacitorSQLite, SQLiteConnection } from '@capacitor-community/sqlite'
@@ -5,6 +6,7 @@ import { CapacitorSQLite, SQLiteConnection } from '@capacitor-community/sqlite'
 const DATABASE_NAME = 'chat_rp'
 const sqlite = new SQLiteConnection(CapacitorSQLite)
 let databasePromise = null
+let transactionSequence = Promise.resolve()
 
 const clone = (value) => (
   value == null ? value : JSON.parse(JSON.stringify(value))
@@ -136,6 +138,7 @@ async function getDatabase() {
       CREATE INDEX IF NOT EXISTS idx_native_chapters
         ON conversations(relationship_id, chapter_number);
     `)
+    await db.execute(archives.TRASH_SCHEMA)
     const relationshipColumns = new Set(
       ((await db.query('PRAGMA table_info(relationships)')).values || [])
         .map(column => column.name),
@@ -166,17 +169,21 @@ async function rows(statement, values = []) {
   return result.values || []
 }
 
-async function inTransaction(callback) {
-  const db = await getDatabase()
-  await db.beginTransaction()
-  try {
-    const result = await callback(db)
-    await db.commitTransaction()
-    return result
-  } catch (error) {
-    await db.rollbackTransaction().catch(() => null)
-    throw error
-  }
+function inTransaction(callback) {
+  const operation = transactionSequence.catch(() => null).then(async () => {
+    const db = await getDatabase()
+    await db.beginTransaction()
+    try {
+      const result = await callback(db)
+      await db.commitTransaction()
+      return result
+    } catch (error) {
+      await db.rollbackTransaction().catch(() => null)
+      throw error
+    }
+  })
+  transactionSequence = operation
+  return operation
 }
 
 function normalizeConversation(row, includeSnapshot = false) {
@@ -497,8 +504,11 @@ export async function updateRelationshipSettings(id, input = {}) {
 
 export async function deleteRelationship(id) {
   if (!(await getRelationship(id))) return false
-  const db = await getDatabase()
-  await db.run('DELETE FROM relationships WHERE id = ?', [id])
+  const data = await exportArchives(id)
+  await inTransaction(async db => {
+    await db.run('INSERT INTO archive_trash (id, title, deleted_at, bundle_json) VALUES (?, ?, ?, ?)', [uuid(), data.relationships[0].title, new Date().toISOString(), JSON.stringify(data)], false)
+    await db.run('DELETE FROM relationships WHERE id = ?', [id], false)
+  })
   return true
 }
 
@@ -506,4 +516,36 @@ export async function deleteConversation(id) {
   const conversation = await getConversation(id)
   if (!conversation) return false
   return deleteRelationship(conversation.relationshipId)
+}
+
+export async function exportArchives(id) {
+  return inTransaction(async db => {
+    const relationshipRows = await db.query(id ? 'SELECT * FROM relationships WHERE id = ?' : 'SELECT * FROM relationships', id ? [id] : [])
+    const conversationRows = await db.query(id ? 'SELECT * FROM conversations WHERE relationship_id = ?' : 'SELECT * FROM conversations', id ? [id] : [])
+    return archives.bundle(relationshipRows.values || [], conversationRows.values || [])
+  })
+}
+
+async function insertArchives(db, data) {
+  for (const table of Object.keys(archives.COLUMNS)) {
+    for (const row of data[table]) await db.run(archives.insertSQL(table), archives.values(table, row), false)
+  }
+}
+export async function importArchives(input) {
+  const data = archives.prepareImport(input, uuid)
+  await inTransaction(db => insertArchives(db, data))
+  return { importedCount: data.relationships.length, relationshipId: data.relationships[0]?.id }
+}
+export async function listTrash() {
+  return rows('SELECT id, title, deleted_at AS deletedAt FROM archive_trash ORDER BY deleted_at DESC')
+}
+export async function restoreArchive(id) {
+  const [row] = await rows('SELECT bundle_json FROM archive_trash WHERE id = ?', [id])
+  if (!row) return null
+  const data = archives.prepareImport(JSON.parse(row.bundle_json), uuid)
+  await inTransaction(async db => {
+    await insertArchives(db, data)
+    await db.run('DELETE FROM archive_trash WHERE id = ?', [id], false)
+  })
+  return { relationshipId: data.relationships[0].id }
 }

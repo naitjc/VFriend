@@ -92,3 +92,14 @@ test('prompt uses confirmed stage, corrected state and style examples without fi
   assert.match(prompt, /不代表承诺或关系升级/);
   assert.doesNotMatch(prompt, /夫人|记挂着她|主动表达关心和依恋/);
 });
+
+test('auxiliary deadline aborts its underlying request instead of retrying it', async () => {
+  const { boundedCall } = require('../../shared/runtime.cjs');
+  let calls = 0;
+  await assert.rejects(boundedCall(async (_, options) => {
+    calls++;
+    assert.equal(options.maxRetries, 0);
+    return new Promise((_, reject) => options.signal.addEventListener('abort', () => reject(new DOMException('deadline', 'AbortError')), { once: true }));
+  }, [], { timeout: 10 }), { name: 'AbortError' });
+  assert.equal(calls, 1);
+});

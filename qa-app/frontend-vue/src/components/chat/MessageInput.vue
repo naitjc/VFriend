@@ -23,14 +23,18 @@ const inputPlaceholder = computed(() => {
   return name ? `对${name}说点什么…` : '输入消息…'
 })
 
+const restoreDraft = (text, conversationId) => {
+  if (conversationId === chatStore.activeConversationId) chatInput.value = chatInput.value ? `${text}\n${chatInput.value}` : text
+}
 const sendMessage = async () => {
   if (!canSend.value) return
   const text = chatInput.value
+  const conversationId = chatStore.activeConversationId
   chatInput.value = ''
   try {
-    if (await chatStore.sendMessage(text) === false) chatInput.value = text
+    if (await chatStore.sendMessage(text) === false) restoreDraft(text, conversationId)
   } catch (error) {
-    chatInput.value = text
+    restoreDraft(text, conversationId)
     ElMessage.error(error.message)
   }
 }
@@ -99,11 +103,13 @@ const insertEmoji = (emoji) => {
         @keydown.enter="handleEnter"
         class="custom-textarea"
         maxlength="12000"
-        :disabled="chatStore.isSending || !chatStore.activeConversationId || chatStore.isActiveChapterReadOnly"
+        :disabled="!chatStore.activeConversationId || chatStore.isActiveChapterReadOnly"
       />
     </div>
 
+    <el-button v-if="chatStore.isSending" class="stop-btn" @click="chatStore.stopGeneration()">{{ chatStore.sendPhase === 'organizing' ? '跳过整理' : '停止' }}</el-button>
     <el-button
+      v-else
       type="primary"
       @click="sendMessage"
       :disabled="!canSend"

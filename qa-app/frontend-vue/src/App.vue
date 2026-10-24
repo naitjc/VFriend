@@ -64,8 +64,6 @@ watch(
     userAvatar: chatStore.userAvatar,
     characterSettings: chatStore.characterSettings,
     chatBackground: chatStore.chatBackground,
-    conversationHistory: chatStore.conversationHistory,
-    apiHistory: chatStore.apiHistory,
     modelParams: chatStore.modelParams,
     bookmarkedIndices: chatStore.bookmarkedIndices,
     searchQuery: chatStore.searchQuery,

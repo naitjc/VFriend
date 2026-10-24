@@ -79,7 +79,7 @@ async function handleChatStream(req, res, next) {
   try {
     let updatedRelationshipState = characterSettings?.relationshipState || null;
     let stateChange = null;
-    const currentHistoryPromise = compressHistoryIfNeeded(history, buildSystemPrompt(characterSettings, chatContext), question);
+    const currentHistoryPromise = compressHistoryIfNeeded(history, buildSystemPrompt(characterSettings, chatContext), question, { signal: abortController.signal });
     let impactPromise = Promise.resolve(null);
 
     if (updatedRelationshipState && question) {
@@ -90,6 +90,7 @@ async function handleChatStream(req, res, next) {
           characterSettings.preferences,
           history,
           characterSettings,
+          { signal: abortController.signal },
         );
     }
 
@@ -97,6 +98,7 @@ async function handleChatStream(req, res, next) {
       currentHistoryPromise,
       impactPromise,
     ]);
+    if (abortController.signal.aborted) return;
 
     if (updatedRelationshipState && impact) {
       try {
@@ -153,9 +155,17 @@ async function handleChatStream(req, res, next) {
     );
 
     if (!fullText.trim()) throw new Error("模型返回了空回复，请重试");
+    const nextApiHistory = [
+      ...currentHistory,
+      currentUserMessage,
+      { role: "assistant", content: fullText },
+    ];
+    // Commit the complete reply before optional continuity work. Interrupting that
+    // work must never discard an already completed reply or its relationship state.
+    send("reply", { history: nextApiHistory, relationshipState: updatedRelationshipState, stateChange });
     if (characterSettings?.basicInfo?.name) send("progress", { phase: "organizing" });
     const continuity = characterSettings?.basicInfo?.name
-      ? await updateContinuity((messages, options) => callLLM(messages, { ...options, maxRetries: 0, signal: abortController.signal }), finalSettings.memory, question, fullText, chatContext.mode)
+      ? await updateContinuity(callLLM, finalSettings.memory, question, fullText, chatContext.mode, { signal: abortController.signal })
       : { memory: finalSettings.memory };
     if (abortController.signal.aborted) return;
 
@@ -167,12 +177,6 @@ async function handleChatStream(req, res, next) {
         stateChange,
       });
     }
-
-    const nextApiHistory = [
-      ...currentHistory,
-      currentUserMessage,
-      { role: "assistant", content: fullText },
-    ];
 
     send("done", {
       history: nextApiHistory,

@@ -3,6 +3,10 @@ import prompts from 'rp-prompt';
 const { normalizeMemory, confirmRelationship, initialRelationshipState, historyTokens, estimateTokens, textContent } = runtimeRules;
 import { defineStore } from "pinia";
 import {
+  exportArchives as exportArchivesApi,
+  importArchives as importArchivesApi,
+  listTrash as listTrashApi,
+  restoreArchive as restoreArchiveApi,
   createNextChapter as createNextChapterApi,
   createRelationship as createRelationshipApi,
   deleteRelationship as deleteRelationshipApi,
@@ -61,6 +65,8 @@ const freshRelationshipState = (state = null) => ({
 
 const randomInitialMood = () => Math.floor(Math.random() * 21) - 10;
 
+const turnControllers = new Map();
+const savedSignatures = new Map();
 let saveTimer = null;
 let saveSequence = Promise.resolve();
 const MIN_CHAPTER_CHECK_MESSAGES = 8;
@@ -147,6 +153,10 @@ export const useChatStore = defineStore("chat", {
       return state.conversationHistory.filter((message) =>
         (message.content || "").toLowerCase().includes(query),
       );
+    },
+    retryableMessageIndex(state) {
+      const index = state.conversationHistory.length - 1;
+      return ["failed", "stopped"].includes(state.conversationHistory[index]?.delivery) ? index : -1;
     },
     contextUsage(state) {
       const tokens = historyTokens(state.apiHistory) + estimateTokens(prompts.buildSystemPrompt(state.characterSettings));
@@ -826,14 +836,21 @@ export const useChatStore = defineStore("chat", {
 
       const conversationId = this.activeConversationId;
       const payload = this._buildPersistencePayload();
-      const request = () => updateConversationApi(conversationId, payload);
+      const signature = JSON.stringify(payload);
+      const request = async () => {
+        if (!force && savedSignatures.get(conversationId) === signature) return null;
+        const result = await updateConversationApi(conversationId, payload);
+        savedSignatures.clear();
+        savedSignatures.set(conversationId, signature);
+        return result;
+      };
       saveSequence = saveSequence.catch(() => null).then(request);
 
       try {
         const conversation = await saveSequence;
-        this._upsertConversationMetadata(conversation);
+        if (conversation) this._upsertConversationMetadata(conversation);
         this.persistenceError = "";
-        return conversation;
+        return conversation || true;
       } catch (error) {
         this.persistenceError = `保存会话失败：${error.message}`;
         console.error(this.persistenceError);
@@ -1178,47 +1195,78 @@ export const useChatStore = defineStore("chat", {
       }
     },
 
-    async sendMessage(question) {
-      if (
-        !question.trim() ||
-        this.isSending ||
-        !this.activeConversationId ||
-        this.isActiveChapterReadOnly
-      ) {
-        return;
+    async exportBackup() {
+      if (this.isSending) throw new Error("请先停止或完成当前回复");
+      if (this.activeConversationId && !this.isActiveChapterReadOnly && !await this.persistActiveConversation({ force: true })) throw new Error(this.persistenceError);
+      return { ...await exportArchivesApi(), customCharacters: cloneValue(this.customCharacters) };
+    },
+    async importBackup(data) {
+      if (this.isSending) throw new Error("请先停止或完成当前回复");
+      if (this.activeConversationId && !this.isActiveChapterReadOnly && !await this.persistActiveConversation({ force: true })) throw new Error(this.persistenceError);
+      const result = await importArchivesApi(data);
+      if (Array.isArray(data.customCharacters)) {
+        const known = new Set(this.customCharacters.map(character => character.id));
+        this.customCharacters.push(...data.customCharacters.filter(character => character?.id && character.basicInfo?.name && !known.has(character.id)));
+        try { localStorage.setItem("customCharacters", JSON.stringify(this.customCharacters)); } catch { this.persistenceError = "存档已导入，浏览器角色库空间不足；角色快照仍保存在存档内。"; }
       }
+      this._setRelationships(await listRelationshipsApi());
+      if (result.relationshipId) await this.switchRelationship(result.relationshipId);
+      return result;
+    },
+    async listDeletedArchives() { return listTrashApi(); },
+    async restoreDeletedArchive(id) {
+      if (this.isSending) throw new Error("请先停止或完成当前回复");
+      const result = await restoreArchiveApi(id);
+      this._setRelationships(await listRelationshipsApi());
+      if (result?.relationshipId) {
+        await this.switchRelationship(result.relationshipId);
+        const recovered = this.characterSettings;
+        if (recovered.id && !this.customCharacters.some(character => character.id === recovered.id)) {
+          this.customCharacters.push(cloneValue(recovered));
+          try { localStorage.setItem("customCharacters", JSON.stringify(this.customCharacters)); } catch { /* Snapshot is still persisted in SQLite. */ }
+        }
+      }
+      return result;
+    },
+
+    stopGeneration() {
+      turnControllers.get(this.activeConversationId)?.abort();
+    },
+
+    async retryMessage(index) {
+      if (index !== this.retryableMessageIndex || this.isSending) return;
+      const question = this.conversationHistory[index]?.requestQuestion;
+      if (question) return this.sendMessage(question, { retryIndex: index });
+    },
+
+    async sendMessage(question, { retryIndex = null } = {}) {
+      if (!question.trim() || this.isSending || !this.activeConversationId || this.isActiveChapterReadOnly) return false;
+      const controller = new AbortController();
+      turnControllers.set(this.activeConversationId, controller);
       this.isSending = true;
       this.sendPhase = "preparing";
-      if (!await this.persistActiveConversation({ force: true })) {
+      if (!await this.persistActiveConversation({ force: true }) || controller.signal.aborted) {
         this.isSending = false;
         this.sendPhase = "";
+        turnControllers.delete(this.activeConversationId);
         return false;
       }
-
       if (this.chapterSuggestion) this.dismissChapterSuggestion();
       if (this.goalSuggestion) this.dismissGoalSuggestion();
-
-      this.addMessage("user", question);
+      if (retryIndex == null) this.addMessage("user", question);
       this.streamingContent = "";
       this.stateChangeNotice = null;
       this.continuityWarning = "";
-
-      const placeholderIndex = this.conversationHistory.length;
-      this.conversationHistory.push({
-        role: "assistant",
-        displayRole: "bot",
-        content: "",
-        streaming: true,
-        timestamp: this._makeTimestamp(),
-        bookmarked: false,
-      });
-
+      const placeholderIndex = retryIndex ?? this.conversationHistory.length;
+      const oldMessage = this.conversationHistory[placeholderIndex];
+      this.conversationHistory[placeholderIndex] = {
+        role: "assistant", displayRole: "bot", content: "", streaming: true,
+        timestamp: oldMessage?.timestamp || this._makeTimestamp(), bookmarked: oldMessage?.bookmarked || false,
+        requestQuestion: question, delivery: "generating",
+      };
       const payload = {
         question,
-        history: this.apiHistory.map((message) => ({
-          role: message.role,
-          content: message.content,
-        })),
+        history: this.apiHistory.map(({ role, content }) => ({ role, content })),
         characterSettings: cloneValue(this.characterSettings),
         chatContext: {
           mode: this.activeRelationship?.mode || "free",
@@ -1230,64 +1278,81 @@ export const useChatStore = defineStore("chat", {
         temperature: parseFloat(this.modelParams.temperature.toFixed(2)),
         top_p: parseFloat(this.modelParams.top_p.toFixed(2)),
       };
-
       let responseCompleted = false;
+      let renderTimer;
+      let pendingText = "";
+      const flush = () => {
+        clearTimeout(renderTimer);
+        renderTimer = null;
+        if (!pendingText) return;
+        this.streamingContent += pendingText;
+        pendingText = "";
+        this.conversationHistory[placeholderIndex].content = this.streamingContent;
+      };
+      const commitReply = ({ history, relationshipState, stateChange }) => {
+        flush();
+        if (relationshipState) this.characterSettings.relationshipState = relationshipState;
+        this.stateChangeNotice = stateChange || null;
+        const notice = this.stateChangeNotice;
+        if (notice) setTimeout(() => { if (this.stateChangeNotice === notice) this.stateChangeNotice = null; }, 5000);
+        const completeText = history?.at(-1)?.role === "assistant" ? history.at(-1).content : this.streamingContent;
+        this.streamingContent = completeText;
+        this.conversationHistory[placeholderIndex] = {
+          ...this.conversationHistory[placeholderIndex], content: completeText,
+          streaming: false, delivery: "complete", error: "",
+        };
+        if (history) this.apiHistory = history;
+        responseCompleted = true;
+      };
       try {
         await sendMessageStream(payload, {
-          onProgress: ({ phase }) => {
-            if (phase === "organizing") this.sendPhase = phase;
-          },
-          onChunk: (text) => {
+          signal: controller.signal,
+          onProgress: ({ phase }) => { if (phase === "organizing") { flush(); this.sendPhase = phase; } },
+          onChunk: text => {
+            if (controller.signal.aborted) return;
             this.sendPhase = "replying";
-            this.streamingContent += text;
-            this.conversationHistory[placeholderIndex] = {
-              ...this.conversationHistory[placeholderIndex],
-              content: this.streamingContent,
-            };
+            pendingText += text;
+            if (!renderTimer) renderTimer = setTimeout(flush, 40);
           },
-          // Commit only with the terminal event, so interrupted SSE cannot partially update a save.
-          onDone: ({ history, memory, relationshipState, stateChange, continuityWarning }) => {
-            if (relationshipState) this.characterSettings.relationshipState = relationshipState;
-            this.stateChangeNotice = stateChange || null;
-            const notice = this.stateChangeNotice;
-            if (notice) setTimeout(() => { if (this.stateChangeNotice === notice) this.stateChangeNotice = null; }, 5000);
-            this.continuityWarning = continuityWarning || "";
-            responseCompleted = true;
-            this.conversationHistory[placeholderIndex] = {
-              ...this.conversationHistory[placeholderIndex],
-              content: this.streamingContent,
-              streaming: false,
-            };
-            if (history) this.apiHistory = history;
-            if (memory) this.characterSettings.memory = memory;
+          onReply: data => {
+            commitReply(data);
+            // Preserve a complete reply even if the app closes during continuity work.
+            void this.persistActiveConversation({ force: true });
           },
-          onError: (message) => {
-            this.conversationHistory[placeholderIndex] = {
-              ...this.conversationHistory[placeholderIndex],
-              content: `出错了：${message}`,
-              streaming: false,
-            };
+          onDone: data => {
+            commitReply(data);
+            if (data.memory) this.characterSettings.memory = data.memory;
+            this.continuityWarning = data.continuityWarning || "";
           },
+          onError: message => { throw new Error(message); },
         });
       } catch (error) {
-        const errorMessage = error.message || "网络似乎出了点问题，请稍后再试。";
-        this.conversationHistory[placeholderIndex] = {
-          ...this.conversationHistory[placeholderIndex],
-          content: errorMessage,
-          streaming: false,
-        };
+        flush();
+        const stopped = controller.signal.aborted;
+        if (responseCompleted) {
+          this.continuityWarning = "回复已保存，本轮事项整理已跳过，可在记忆面板中手动整理。";
+        } else {
+          this.conversationHistory[placeholderIndex] = {
+            ...this.conversationHistory[placeholderIndex],
+            content: this.streamingContent,
+            streaming: false,
+            delivery: stopped ? "stopped" : "failed",
+            error: stopped ? "已停止，未完成内容未计入后续上下文" : error.message || "连接中断，请重试",
+          };
+        }
       } finally {
+        flush();
+        turnControllers.delete(this.activeConversationId);
         this.isSending = false;
         this.sendPhase = "";
         this.streamingContent = "";
         const saved = await this.persistActiveConversation({ force: true });
-        if (responseCompleted && saved) {
+        if (responseCompleted && saved && !controller.signal.aborted) {
           await this.checkGoalSuggestion({ alreadyPersisted: true });
-          if (!this.goalSuggestion) {
-            await this.checkChapterSuggestion({ alreadyPersisted: true });
-          }
+          if (!this.goalSuggestion) await this.checkChapterSuggestion({ alreadyPersisted: true });
         }
       }
+      return true;
     },
   },
 });

@@ -120,6 +120,10 @@ const avatarSrc = computed(() => {
           <div v-else class="md-content" v-html="renderedContent"></div>
         </div>
       </div>
+      <div v-if="msg.delivery === 'failed' || msg.delivery === 'stopped'" class="delivery-notice" role="status">
+        <span>{{ msg.error || '回复未完成' }}</span>
+        <el-button v-if="index === chatStore.retryableMessageIndex && !chatStore.isActiveChapterReadOnly" size="small" :disabled="chatStore.isSending" @click="chatStore.retryMessage(chatStore.retryableMessageIndex)">重试本轮</el-button>
+      </div>
     </div>
 
   </div>
@@ -232,6 +236,7 @@ const avatarSrc = computed(() => {
 }
 
 .plain { white-space: pre-wrap; }
+.delivery-notice { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--text-secondary); padding: 6px 2px; }
 
 @media (max-width: 800px) {
   .chat-message-item {

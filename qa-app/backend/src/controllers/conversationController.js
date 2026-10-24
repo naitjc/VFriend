@@ -307,3 +307,10 @@ module.exports = {
   createNextChapter,
   fork,
 };
+
+Object.assign(module.exports, {
+  exportArchives: conversationStore.exportArchives,
+  importArchives: conversationStore.importArchives,
+  listTrash: conversationStore.listTrash,
+  restoreArchive: conversationStore.restoreArchive,
+});

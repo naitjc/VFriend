@@ -46,7 +46,19 @@ watch(() => chatStore.showSearch, searching => {
   if (searching) hasUnread.value = false
   else scrollToBottom()
 })
-const displayMessages = computed(() => chatStore.filteredHistory)
+const visibleCount = ref(80)
+const displayMessages = computed(() => chatStore.filteredHistory.slice(-visibleCount.value))
+const hiddenMessageCount = computed(() => Math.max(0, chatStore.filteredHistory.length - visibleCount.value))
+watch(() => [chatStore.activeConversationId, chatStore.searchQuery], () => { visibleCount.value = 80 })
+const loadOlderMessages = async () => {
+  const element = chatBoxRef.value
+  if (!element) return
+  const height = element.scrollHeight
+  const top = element.scrollTop
+  visibleCount.value += 80
+  await nextTick()
+  element.scrollTop = top + element.scrollHeight - height
+}
 const sendStatus = computed(() => ({ preparing: '正在准备回复…', replying: '正在回复…', organizing: '正在整理记忆…' })[chatStore.sendPhase] || '正在回复…')
 
 const stateNoticeItems = computed(() => {
@@ -230,17 +242,18 @@ const createInheritedConversation = async () => {
       :style="chatStore.chatBackground ? { backgroundImage: `url(${chatStore.chatBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}"
     >
       <div class="message-stream">
+        <el-button v-if="hiddenMessageCount" class="load-older" @click="loadOlderMessages">加载更早消息（{{ hiddenMessageCount }} 条）</el-button>
         <div v-if="!chatStore.activeConversationId" class="empty-chat-state">
           <span class="empty-chat-icon">💬</span>
           <strong>选择一种模式开始聊天</strong>
           <span>在左侧新建“自由模式”或“故事模式”存档。</span>
         </div>
         <TransitionGroup name="chat-list">
-          <template v-for="(msg, index) in displayMessages" :key="msg.timestamp + index">
+          <template v-for="(msg, index) in displayMessages" :key="msg.id || msg.timestamp + '-' + (hiddenMessageCount + index)">
             <MessageBubble
               v-if="!msg.streaming || msg.content"
               :msg="msg"
-              :index="index"
+              :index="chatStore.conversationHistory.indexOf(msg)"
               :search-query="chatStore.searchQuery"
               @toggle-bookmark="toggleBookmark(msg)"
             />
@@ -522,6 +535,7 @@ const createInheritedConversation = async () => {
   scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
+.load-older { align-self: center; flex-shrink: 0; margin: 6px 0 14px; }
 .message-stream {
   width: 100%;
   max-width: 900px;

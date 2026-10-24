@@ -1,3 +1,4 @@
+const archives = require('../../../shared/archives.cjs');
 const { initialRelationshipState } = require("../../../shared/runtime.cjs");
 const fs = require("fs");
 const path = require("path");
@@ -10,6 +11,7 @@ fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 
 const db = new DatabaseSync(databasePath);
 db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+db.exec(archives.TRASH_SCHEMA);
 
 function columnNames(tableName) {
   return new Set(
@@ -807,6 +809,8 @@ function deleteConversation(id) {
 function deleteRelationship(id) {
   if (!getRelationshipStatement.get(id)) return false;
   return runTransaction(() => {
+    const data = exportArchives(id);
+    db.prepare("INSERT INTO archive_trash (id, title, deleted_at, bundle_json) VALUES (?, ?, ?, ?)").run(randomUUID(), data.relationships[0].title, new Date().toISOString(), JSON.stringify(data));
     deleteRelationshipConversationsStatement.run(id);
     return deleteRelationshipStatement.run(id).changes > 0;
   });
@@ -828,3 +832,35 @@ module.exports = {
   deleteConversation,
   deleteRelationship,
 };
+
+function exportArchives(id) {
+  return archives.bundle(
+    id ? db.prepare('SELECT * FROM relationships WHERE id = ?').all(id) : db.prepare('SELECT * FROM relationships').all(),
+    id ? db.prepare('SELECT * FROM conversations WHERE relationship_id = ?').all(id) : db.prepare('SELECT * FROM conversations').all(),
+  );
+}
+function insertArchives(data) {
+  for (const table of Object.keys(archives.COLUMNS)) {
+    const statement = db.prepare(archives.insertSQL(table));
+    for (const row of data[table]) statement.run(...archives.values(table, row));
+  }
+}
+function importArchives(input) {
+  const data = archives.prepareImport(input, randomUUID);
+  runTransaction(() => insertArchives(data));
+  return { importedCount: data.relationships.length, relationshipId: data.relationships[0]?.id };
+}
+function listTrash() {
+  return db.prepare('SELECT id, title, deleted_at AS deletedAt FROM archive_trash ORDER BY deleted_at DESC').all();
+}
+function restoreArchive(id) {
+  const row = db.prepare('SELECT bundle_json FROM archive_trash WHERE id = ?').get(id);
+  if (!row) return null;
+  const data = archives.prepareImport(JSON.parse(row.bundle_json), randomUUID);
+  runTransaction(() => {
+    insertArchives(data);
+    db.prepare('DELETE FROM archive_trash WHERE id = ?').run(id);
+  });
+  return { relationshipId: data.relationships[0].id };
+}
+Object.assign(module.exports, { exportArchives, importArchives, listTrash, restoreArchive });

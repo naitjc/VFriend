@@ -17,6 +17,7 @@ import {
   Setting,
   User,
 } from '@element-plus/icons-vue'
+import { saveTextFile, openBackupFile } from '../services/archiveFiles'
 import { readOptimizedImage } from '../utils/imageFile'
 import { isNativeApp } from '../services/platform'
 import { FIXED_NATIVE_MODEL } from '../services/nativeModelConfig'
@@ -177,7 +178,7 @@ const guideSections = [
       { title: '数据保存位置', detail: 'Android 存档保存在手机本地 SQLite；Web 存档保存在 Web 后端。两端目前不会自动同步。' },
       { title: '导出对话', detail: '打开“更多”→“导出对话”，可把当前聊天记录保存为文本文件。导出前请先进入目标存档。' },
       { title: '更新与卸载', detail: '正常覆盖安装新版 APK 通常会保留应用数据；卸载应用会清除手机本地数据，因此卸载前应先导出重要对话。' },
-      { title: '删除要谨慎', detail: '删除角色可能同时删除关联存档；删除存档会移除其中的消息、章节和状态，目前无法恢复。' },
+      { title: '删除要谨慎', detail: '删除存档或角色关联存档时会先放入回收站，可恢复其中的消息、章节和状态。' },
       { title: '功能点不了', detail: '先确认已选择角色并打开存档；过去章节只能查看；发送中或加载中时部分按钮会暂时禁用。' },
       { title: '界面异常', detail: '尝试关闭并重新打开应用。若仍有问题，请记录手机型号、系统版本、操作步骤和错误提示，便于定位。' },
     ],
@@ -325,7 +326,7 @@ const deleteCustomChar = async (character) => {
     : ''
   try {
     await ElMessageBox.confirm(
-      `将永久删除角色“${characterName}”${archiveText}。此操作无法恢复。`,
+      `将移除角色“${characterName}”${archiveText}。关联存档会放入回收站，恢复存档时会带回角色设定。`,
       '确认删除角色',
       {
         confirmButtonText: '删除角色',
@@ -348,21 +349,52 @@ const deleteCustomChar = async (character) => {
   }
 }
 
-const exportHistory = () => {
-  const history = chatStore.conversationHistory
-  if (!history.length) return
-  const lines = history.map(m => {
-    const name = m.displayRole === 'user' ? '我' : (m.characterName || chatStore.characterSettings.basicInfo.name || '角色')
-    const time = m.timestamp ? `[${new Date(m.timestamp).toLocaleTimeString('zh-CN')}]` : ''
-    return `${time} [${name}]: ${m.content}`
-  })
-  const blob = new Blob([lines.join('\n\n')], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = `对话记录_${new Date().toLocaleDateString('zh-CN')}.txt`
-  a.click(); URL.revokeObjectURL(url)
-  showMoreMenu.value = false
+const archiveWorking = ref(false)
+const trashOpen = ref(false)
+const deletedArchives = ref([])
+const withArchiveAction = async action => {
+  if (archiveWorking.value || chatStore.isSending) return
+  archiveWorking.value = true
+  try { await action() } catch (error) {
+    if (error !== 'cancel' && error !== 'close') ElMessage.error(error.message || '操作失败')
+  } finally { archiveWorking.value = false }
 }
+const exportHistory = () => withArchiveAction(async () => {
+  const lines = chatStore.conversationHistory.map(m => {
+    const name = m.displayRole === 'user' ? '我' : (m.characterName || chatStore.characterSettings.basicInfo.name || '角色')
+    return `[${m.timestamp || ''}] [${name}]: ${m.content}${m.delivery === 'failed' || m.delivery === 'stopped' ? '\n[未完成]' : ''}`
+  })
+  await saveTextFile(`对话记录_${new Date().toISOString().slice(0, 10)}.txt`, lines.join('\n\n'), 'text/plain')
+  showMoreMenu.value = false
+})
+const exportBackup = () => withArchiveAction(async () => {
+  const backup = await chatStore.exportBackup()
+  const result = await saveTextFile(`Chat-RP_完整备份_${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup))
+  if (!result.cancelled) ElMessage.success('完整备份已导出')
+  showMoreMenu.value = false
+})
+const importBackup = () => withArchiveAction(async () => {
+  const text = await openBackupFile()
+  if (text == null) return
+  if (text.error) throw new Error(text.error)
+  let backup
+  try { backup = JSON.parse(text) } catch { throw new Error('无法读取备份，请选择完整备份 JSON 文件') }
+  if (backup.format !== 'chat-rp-backup' || backup.version !== 1 || !Array.isArray(backup.relationships)) throw new Error('不是受支持的 Chat RP 完整备份')
+  await ElMessageBox.confirm(`将新增 ${backup.relationships.length} 个存档副本，包含角色设定、关系、记忆和全部章节。`, '导入完整备份', { confirmButtonText: '导入副本', cancelButtonText: '取消' })
+  const result = await chatStore.importBackup(backup)
+  ElMessage.success(`已导入 ${result.importedCount} 个存档`)
+  showMoreMenu.value = false
+})
+const openTrash = () => withArchiveAction(async () => {
+  deletedArchives.value = await chatStore.listDeletedArchives()
+  trashOpen.value = true
+  showMoreMenu.value = false
+})
+const restoreDeleted = id => withArchiveAction(async () => {
+  await chatStore.restoreDeletedArchive(id)
+  deletedArchives.value = await chatStore.listDeletedArchives()
+  ElMessage.success('存档及全部章节已恢复')
+})
 
 const applyTheme = (theme) => {
   chatStore.setTheme(theme)
@@ -650,11 +682,19 @@ const displayName = computed(() => {
             <div class="menu-actions-grid">
               <el-button class="menu-action" :disabled="!chatStore.conversationHistory.length" @click="exportHistory">
                 <el-icon><Download /></el-icon>
-                <span>导出对话</span>
+                <span>导出聊天文本</span>
               </el-button>
             </div>
           </section>
 
+          <section class="menu-section">
+            <div class="menu-section-title">存档与备份</div>
+            <div class="menu-actions-grid">
+              <el-button class="menu-action" :disabled="chatStore.isSending || archiveWorking" @click="exportBackup">完整备份</el-button>
+              <el-button class="menu-action" :disabled="chatStore.isSending || archiveWorking" @click="importBackup">导入备份</el-button>
+              <el-button class="menu-action" :disabled="chatStore.isSending || archiveWorking" @click="openTrash">回收站</el-button>
+            </div>
+          </section>
           <section class="menu-section model-params-section">
             <div class="menu-section-title"><el-icon><Setting /></el-icon> 模型参数</div>
             <div class="model-param-row">
@@ -704,6 +744,14 @@ const displayName = computed(() => {
     </div>
   </el-header>
 
+  <el-dialog v-model="trashOpen" title="存档回收站" width="min(92vw, 520px)">
+    <p class="native-settings-note">删除的存档保留在这里，可恢复全部章节、角色、关系与记忆。</p>
+    <p v-if="!deletedArchives.length" class="native-settings-note">回收站为空</p>
+    <div v-for="item in deletedArchives" :key="item.id" class="trash-row">
+      <div><strong>{{ item.title }}</strong><small>{{ new Date(item.deletedAt).toLocaleString('zh-CN') }}</small></div>
+      <el-button :disabled="archiveWorking || chatStore.isSending" @click="restoreDeleted(item.id)">恢复存档</el-button>
+    </div>
+  </el-dialog>
   <!-- 角色创建向导 -->
   <CharacterWizard v-if="showWizard" @save="onWizardSave" @close="showWizard = false" />
 
@@ -1171,4 +1219,10 @@ const displayName = computed(() => {
     padding: 14px 16px max(16px, env(safe-area-inset-bottom)) !important;
   }
 }
+</style>
+
+<style scoped>
+.trash-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border-glass); }
+.trash-row div { display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.trash-row small { color: var(--text-secondary); }
 </style>

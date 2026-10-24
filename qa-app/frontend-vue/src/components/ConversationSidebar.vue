@@ -64,6 +64,8 @@ const displayArchiveTitle = (relationship) => {
   return relationship.title
 }
 
+const archivePreview = relationship => [...(relationship.chapters || [])].reverse().find(chapter => chapter.preview)?.preview || '还没有聊天记录'
+
 const nextDefaultTitle = (mode) => {
   const label = mode === 'story' ? '故事' : '自由聊天'
   const count = archives.value.filter((archive) => archive.mode === mode).length
@@ -227,7 +229,7 @@ const removeArchive = async (relationship) => {
   const contentLabel = relationship.mode === 'story' ? '其中的全部章节' : '全部聊天记录'
   try {
     await ElMessageBox.confirm(
-      `删除“${displayArchiveTitle(relationship)}”和${contentLabel}？此操作无法恢复。`,
+      `删除“${displayArchiveTitle(relationship)}”和${contentLabel}？存档会放入回收站，可从“更多 → 回收站”恢复。`,
       '删除存档',
       {
         type: 'warning',
@@ -335,6 +337,7 @@ const handleChapterCommand = (command, relationship, chapter) => {
                 {{ formatUpdatedAt(relationship.updatedAt) }}
               </span>
             </span>
+            <span class="archive-preview">{{ archivePreview(relationship) }}</span>
           </button>
 
           <el-dropdown
@@ -921,4 +924,8 @@ const handleChapterCommand = (command, relationship, chapter) => {
   }
   .mode-options { grid-template-columns: 1fr; }
 }
+</style>
+
+<style scoped>
+.archive-preview { display: block; font-size: 12px; line-height: 1.6; margin-top: 7px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 205px; }
 </style>

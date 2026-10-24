@@ -262,11 +262,13 @@ export async function deleteConversation(id) {
  */
 export async function sendMessageStream(
   payload,
-  { onChunk, onState, onDone, onError, onProgress } = {},
+  { onChunk, onState, onDone, onError, onProgress, onReply, signal } = {},
 ) {
   if (isNativeApp) {
     return (await nativeRuntime()).sendNativeMessage(payload, {
       onChunk,
+      onReply,
+      signal,
       onProgress,
       onState,
       onDone,
@@ -280,6 +282,7 @@ export async function sendMessageStream(
       ...webModelHeaders(),
     },
     body: JSON.stringify(payload),
+    signal,
   });
 
   if (!response.ok) {
@@ -293,41 +296,41 @@ export async function sendMessageStream(
   let completed = false;
   let streamError = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    eventBuffer += decoder.decode(value, { stream: true });
-
-    // SSE 事件以双换行分隔
-    const blocks = eventBuffer.split("\n\n");
-    eventBuffer = blocks.pop(); // 保留不完整的末块
-
-    for (const block of blocks) {
-      if (!block.trim()) continue;
-      let eventType = "message";
-      let dataLine = "";
-      for (const line of block.split("\n")) {
-        if (line.startsWith("event: ")) eventType = line.slice(7).trim();
-        if (line.startsWith("data: ")) dataLine = line.slice(6).trim();
-      }
-      if (!dataLine) continue;
-      try {
-        const data = JSON.parse(dataLine);
-        if (eventType === "chunk" && onChunk) onChunk(data.text);
-        if (eventType === "progress" && onProgress) onProgress(data);
-        if (eventType === "state" && onState) onState(data);
+  try {
+    while (!completed && !streamError) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      eventBuffer += decoder.decode(value, { stream: true });
+      const blocks = eventBuffer.split("\n\n");
+      eventBuffer = blocks.pop();
+      for (const block of blocks) {
+        let eventType = "message";
+        let dataLine = "";
+        for (const line of block.split("\n")) {
+          if (line.startsWith("event: ")) eventType = line.slice(7).trim();
+          if (line.startsWith("data: ")) dataLine = line.slice(6).trim();
+        }
+        if (!dataLine) continue;
+        let data;
+        try { data = JSON.parse(dataLine); } catch { continue; }
+        if (eventType === "chunk") onChunk?.(data.text);
+        if (eventType === "reply") onReply?.(data);
+        if (eventType === "progress") onProgress?.(data);
+        if (eventType === "state") onState?.(data);
         if (eventType === "done") {
           completed = true;
-          if (onDone) onDone(data);
+          onDone?.(data);
         }
         if (eventType === "error") {
           streamError = data.message || "生成回复失败";
-          if (onError) onError(streamError);
+          onError?.(streamError);
         }
-      } catch {
-        /* 忽略解析失败 */
+        if (completed || streamError) break;
       }
     }
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
   }
 
   if (streamError) throw new Error(streamError);
@@ -354,4 +357,21 @@ export async function previewCharacter(characterSettings, question) {
       body: JSON.stringify({ characterSettings, question }),
     })).reply;
   } finally { clearTimeout(timer); }
+}
+
+export async function exportArchives() {
+  if (isNativeApp) return (await nativeStore()).exportArchives();
+  return request('/archives/export');
+}
+export async function importArchives(data) {
+  if (isNativeApp) return (await nativeStore()).importArchives(data);
+  return request('/archives/import', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function listTrash() {
+  if (isNativeApp) return (await nativeStore()).listTrash();
+  return request('/archives/trash');
+}
+export async function restoreArchive(id) {
+  if (isNativeApp) return (await nativeStore()).restoreArchive(id);
+  return request(`/archives/trash/${encodeURIComponent(id)}/restore`, { method: 'POST' });
 }

@@ -1,7 +1,7 @@
 const { callLLM } = require('./llmClient');
 
 const { compressHistory } = require('../../../shared/runtime.cjs');
-const compressHistoryIfNeeded = (history, prompt, question) => compressHistory(callLLM, history, prompt, question);
+const compressHistoryIfNeeded = (history, prompt, question, options) => compressHistory(callLLM, history, prompt, question, options);
 
 async function summarizeChapter(currentHistory) {
     const history = Array.isArray(currentHistory) ? currentHistory : [];
