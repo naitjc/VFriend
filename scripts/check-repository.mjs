@@ -6,17 +6,22 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const errors = []
 const json = async path => JSON.parse(await readFile(resolve(root, path), 'utf8'))
 const manifest = await json('package.json')
-const frontend = await json('qa-app/frontend-vue/package.json')
+const frontend = await json('apps/client/package.json')
+const server = await json('apps/server/package.json')
+const core = await json('packages/core/package.json')
+const serverLock = await json('apps/server/package-lock.json')
 const rootLock = await json('package-lock.json')
-const frontendLock = await json('qa-app/frontend-vue/package-lock.json')
-const gradle = await readFile(resolve(root, 'qa-app/frontend-vue/android/app/build.gradle'), 'utf8')
-for (const [name, version] of [['frontend', frontend.version], ['root lock', rootLock.version], ['frontend lock', frontendLock.version], ['Android', /versionName "([^"]+)"/.exec(gradle)?.[1]]]) {
+const frontendLock = await json('apps/client/package-lock.json')
+const gradle = await readFile(resolve(root, 'apps/client/android/app/build.gradle'), 'utf8')
+for (const [name, version] of [['client', frontend.version], ['server', server.version], ['core', core.version], ['server lock', serverLock.version], ['root lock', rootLock.version], ['frontend lock', frontendLock.version], ['Android', /versionName "([^"]+)"/.exec(gradle)?.[1]]]) {
   if (version !== manifest.version) errors.push(`${name} version ${version} differs from ${manifest.version}`)
 }
-for (const [name, lock] of [['root', rootLock], ['frontend', frontendLock]]) {
+for (const [name, lock] of [['root', rootLock], ['client', frontendLock], ['server', serverLock]]) {
   if (lock.packages[''].version !== manifest.version) errors.push(`${name} lock package version is stale`)
 }
 if (!gradle.includes('applicationId "com.naitjc.chatrp"') || !gradle.includes('applicationIdSuffix ".preview"')) errors.push('Existing Android application IDs must be preserved')
+
+for (const path of Object.values(core.exports)) await access(resolve(root, 'packages/core', path))
 
 // Check local Markdown links without following the network or touching runtime data.
 async function documents(directory) {

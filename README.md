@@ -19,7 +19,7 @@ npm run setup
 npm run dev
 ```
 
-打开 `http://127.0.0.1:5173/`。在“更多操作 → 模型 API 设置”填写模型信息；也可以复制 `qa-app/backend/.env.example` 为同目录的 `.env`，填写服务器默认配置。不设置 Key 也能管理已有存档。
+打开 `http://127.0.0.1:5173/`。在“更多操作 → 模型 API 设置”填写模型信息；也可以复制 `apps/server/.env.example` 为同目录的 `.env`，填写服务器默认配置。不设置 Key 也能管理已有存档。
 
 开发时 Web 通过 Vite 代理连接后端；生产构建默认请求网页同源的 API。外置后端可通过 `VITE_API_URL` 指定，开发代理目标可用 `VFRIEND_API_ORIGIN` 指定。
 
@@ -40,7 +40,7 @@ npm run android:apk
 npm run android:parallel
 ```
 
-标准版产物为 `qa-app/frontend-vue/android/app/build/outputs/apk/debug/app-debug.apk`；共存版在 `outputs/apk/parallel/app-parallel.apk`。当前版本为 **1.6.0**（versionCode **12**）。
+标准版产物为 `apps/client/android/app/build/outputs/apk/debug/app-debug.apk`；共存版在 `outputs/apk/parallel/app-parallel.apk`。当前版本为 **1.6.1**（versionCode **13**）。
 
 本地调试包适合个人测试。历史 v1.3.1 GitHub APK 与当前本地签名不同；迁移和签名说明见 [Android 开发与迁移](docs/DEVELOPMENT.md#android)。CI 调试签名不是稳定的正式发行签名。
 
@@ -48,9 +48,10 @@ npm run android:parallel
 
 | 位置 | 内容 |
 | --- | --- |
-| `qa-app/frontend-vue/` | Vue 界面、Pinia actions、Web/Android 适配器和原生工程 |
-| `qa-app/backend/` | Express API、Web SQLite 存储及回归测试 |
-| `qa-app/shared/` | 聊天编排、章节工作流、目标状态、提示词、快照和备份规则 |
+| `apps/client/` | Vue 界面、Pinia actions、Web/Android 适配器和原生工程 |
+| `apps/server/` | Express API 与 Web SQLite 存储 |
+| `tests/` | Web、Android 适配器和共享逻辑的跨端回归测试 |
+| `packages/core/` | 聊天编排、章节工作流、目标状态、提示词、快照和备份规则 |
 | `scripts/` | 启动、图标生成/校验、仓库检查和旧 Android 存档导出 |
 | `design/` | 正式 Companion V 矢量源、预览、探索稿及来源记录 |
 | `docs/` | 使用、开发、架构与按版本归档的验证记录 |

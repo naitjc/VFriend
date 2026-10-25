@@ -1,0 +1,17 @@
+{
+  "name": "@vfriend/core",
+  "version": "1.6.1",
+  "private": true,
+  "type": "commonjs",
+  "exports": {
+    "./rules": "./chat-rules.cjs",
+    "./prompt": "./chat-prompt.cjs",
+    "./advisors": "./story-advisors.cjs",
+    "./archives": "./archive-format.cjs",
+    "./relationships": "./relationship-rules.cjs",
+    "./snapshots": "./chapter-snapshots.cjs",
+    "./session": "./chat-session.cjs",
+    "./workflow": "./conversation-workflow.cjs",
+    "./model-settings": "./model-settings.cjs"
+  }
+}

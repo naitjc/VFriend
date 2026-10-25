@@ -1,0 +1,36 @@
+{
+  "name": "@vfriend/client",
+  "private": true,
+  "version": "1.6.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "android:sync": "npm run build && cap sync android",
+    "android:apk": "npm run android:sync && cd android && ./gradlew --init-script gradle/repository-mirrors.init.gradle assembleDebug",
+    "android:parallel": "npm run android:sync && cd android && ./gradlew --init-script gradle/repository-mirrors.init.gradle assembleParallel",
+    "lint": "npm --prefix ../.. run lint"
+  },
+  "dependencies": {
+    "@aparajita/capacitor-secure-storage": "^8.0.0",
+    "@capacitor-community/sqlite": "^8.1.0",
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
+    "@element-plus/icons-vue": "^2.3.2",
+    "dompurify": "^3.4.12",
+    "element-plus": "^2.11.9",
+    "marked": "^17.0.5",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.24",
+    "@vfriend/core": "file:../../packages/core"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.2",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "vite": "^7.2.4"
+  },
+  "engines": {
+    "node": "^22.13.0 || >=24.0.0"
+  }
+}

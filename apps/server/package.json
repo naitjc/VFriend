@@ -1,0 +1,25 @@
+{
+  "name": "@vfriend/server",
+  "version": "1.6.1",
+  "description": "Local backend for VFriend, a virtual companion app.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "npm --prefix ../.. test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "@vfriend/core": "file:../../packages/core"
+  },
+  "private": true
+}

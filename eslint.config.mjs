@@ -13,6 +13,6 @@ export default [
       'no-unreachable': 'error',
     },
   },
-  { files: ['qa-app/frontend-vue/src/**/*.{js,vue}'], languageOptions: { globals: globals.browser } },
-  { files: ['qa-app/backend/**/*.{js,cjs,mjs}', 'qa-app/shared/**/*.cjs', 'qa-app/frontend-vue/*.js', 'scripts/*.mjs'], languageOptions: { globals: globals.node } },
+  { files: ['apps/client/src/**/*.{js,vue}'], languageOptions: { globals: globals.browser } },
+  { files: ['apps/server/**/*.{js,cjs,mjs}', 'tests/**/*.{js,cjs,mjs}', 'packages/core/**/*.cjs', 'apps/client/*.js', 'scripts/*.mjs'], languageOptions: { globals: globals.node } },
 ]

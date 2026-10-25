@@ -13,7 +13,7 @@ dist/
 build/
 
 # Local SQLite conversation data
-qa-app/backend/data/
+apps/server/data/
 /android-legacy-backups/
 __pycache__/
 

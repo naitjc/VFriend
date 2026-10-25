@@ -1,27 +1,28 @@
 {
-  "name": "vfriend-project",
+  "name": "vfriend",
   "private": true,
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "VFriend Web and Android development entry points",
   "engines": {
     "node": "^22.13.0 || >=24.0.0"
   },
   "scripts": {
-    "setup": "npm ci && npm --prefix qa-app/backend ci && npm --prefix qa-app/frontend-vue ci",
-    "dev": "node scripts/dev.mjs",
-    "start": "npm --prefix qa-app/backend start",
-    "test": "npm --prefix qa-app/backend test",
-    "build": "npm --prefix qa-app/frontend-vue run build",
+    "setup": "npm ci && npm --prefix apps/server ci && npm --prefix apps/client ci",
+    "dev": "node scripts/start-dev.mjs",
+    "start": "npm --prefix apps/server start",
+    "test": "node --test tests/*.test.js",
+    "build": "npm --prefix apps/client run build",
     "check": "npm run check:repo && npm run lint && npm test && npm run build",
-    "android:apk": "npm --prefix qa-app/frontend-vue run android:apk",
-    "android:parallel": "npm --prefix qa-app/frontend-vue run android:parallel",
-    "icons": "python3 scripts/generate_icons.py",
-    "lint": "eslint qa-app scripts",
-    "check:repo": "node scripts/check-repository.mjs && python3 scripts/generate_icons.py --check"
+    "android:apk": "npm --prefix apps/client run android:apk",
+    "android:parallel": "npm --prefix apps/client run android:parallel",
+    "icons": "python3 scripts/generate-icons.py",
+    "lint": "eslint apps packages tests scripts",
+    "check:repo": "node scripts/check-repository.mjs && python3 scripts/generate-icons.py --check"
   },
   "devDependencies": {
     "eslint": "^10.13.0",
     "eslint-plugin-vue": "^10.11.1",
-    "globals": "^16.5.0"
+    "globals": "^16.5.0",
+    "@vfriend/core": "file:packages/core"
   }
 }

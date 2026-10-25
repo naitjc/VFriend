@@ -2,19 +2,21 @@
 
 ## Shared behavior, platform adapters
 
-`qa-app/shared/chatSession.cjs` owns a complete turn: validation, compression and impact analysis, prompt construction, streaming, complete reply delivery, then bounded continuity work. Web SSE and the native runtime inject their model transports. A complete reply reaches `onReply` before optional memory organization, so cancellation during that phase preserves the reply.
+`packages/core/chat-session.cjs` owns a complete turn: validation, compression and impact analysis, prompt construction, streaming, complete reply delivery, then bounded continuity work. Web SSE and the native runtime inject their model transports. A complete reply reaches `onReply` before optional memory organization, so cancellation during that phase preserves the reply.
 
-`advisors.cjs` owns chapter/goal prompts, evidence validation and summary limits. `snapshots.cjs` owns chapter checkpoints and runtime-state removal. `modelSettings.cjs` validates provider configuration, and `archives.cjs` handles the portable backup format and ID remapping. None of these modules stores credentials or opens a database.
+`story-advisors.cjs` owns chapter/goal prompts, evidence validation and summary limits. `chapter-snapshots.cjs` owns chapter checkpoints and runtime-state removal. `model-settings.cjs` validates provider configuration, and `archive-format.cjs` handles the portable backup format and ID remapping. None of these modules stores credentials or opens a database.
 
-Web uses `backend/app.js` to construct Express independently of `server.js`, which binds the port and handles shutdown. SQLite operations remain in the backend storage adapter. Android uses the same domain rules with native HTTP streaming, SQLite transactions and secure credential storage.
+Web uses `apps/server/app.js` to construct Express independently of `server.js`, which binds the port and handles shutdown. SQLite operations remain in the server storage adapter. Android uses the same domain rules with native HTTP streaming, SQLite transactions and secure credential storage.
 
-`conversationWorkflow.cjs` owns source-chapter ownership, open/story eligibility, summary reuse/fallback and chapter/goal/fork orchestration. Express and the native API adapter inject their storage and model implementations. `relationships.cjs` owns goal updates; Android computes them from the row read inside its write transaction.
+`conversation-workflow.cjs` owns source-chapter ownership, open/story eligibility, summary reuse/fallback and chapter/goal/fork orchestration. Express and the native API adapter inject their storage and model implementations. `relationship-rules.cjs` owns goal updates; Android computes them from the row read inside its write transaction.
 
 ## Frontend state and transport
 
 `store/chatStore.js` exposes the existing Pinia interface. Actions are grouped by responsibility under `store/actions/`: persistence, messaging, navigation, archives, conversations, suggestions, metadata and characters. `store/runtime.js` keeps timers, save queues, saved signatures and abort controllers in a WeakMap keyed by the raw Pinia state, preventing separate store instances from interfering with each other. These resources never enter snapshots.
 
-`api/chat.js` selects `api/web.js` or `api/native.js` and preserves the UI interface. The Web adapter includes provider settings on every model operation; ordinary storage requests carry none. `api/httpClient.js` handles Web JSON requests and SSE decoding; JSON timeouts cover both headers and response bodies and respect caller cancellation. Guide and model configuration components load when opened. Testing a native model configuration validates the draft without saving its key; saving is explicit.
+`packages/core` is a local CommonJS package imported as `@vfriend/core/*` by Node and Vite, without platform dependencies.
+
+`api/index.js` selects `api/web.js` or `api/native.js` and preserves the UI interface. The Web adapter includes provider settings on every model operation; ordinary storage requests carry none. `api/httpClient.js` handles Web JSON requests and SSE decoding; JSON timeouts cover both headers and response bodies and respect caller cancellation. Guide and model configuration components load when opened. Testing a native model configuration validates the draft without saving its key; saving is explicit.
 
 Native writes share one connection and transaction queue. Chapter closure rechecks the source chapter inside its transaction. Writes to closed chapters are rejected. Deletion captures its recoverable backup in the same transaction, and simultaneous restore requests cannot import one trash entry twice.
 

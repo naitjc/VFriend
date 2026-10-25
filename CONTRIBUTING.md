@@ -8,7 +8,7 @@ npm run dev
 npm run check
 ```
 
-Place shared business rules under `qa-app/shared/`; keep HTTP, native plugins, storage connections and credentials in platform adapters. Preserve the public API facade and the existing Android application IDs, storage keys and backup marker.
+Place shared business rules under `packages/core/`; keep HTTP, native plugins, storage connections and credentials in platform adapters. Preserve the public API facade and the existing Android application IDs, storage keys and backup marker.
 
 For behavior changes, add regression coverage at the relevant boundary: workflow rules, HTTP/native adapter behavior, SQLite persistence or client state. Use temporary databases and local model fixtures. A successful SQL bridge or build is not a device test. Simple text, style and asset edits need proportionate validation rather than duplicate implementation tests.
 

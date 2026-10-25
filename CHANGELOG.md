@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.1 — 2026-10-25
+
+- Rename the project directory to VFriend and organize code as apps/client, apps/server, packages/core and tests.
+- Expose shared rules through the private local @vfriend/core package; replace historical rp-* aliases and long relative core imports.
+- Use descriptive kebab-case names for shared modules and CLI scripts; make src/api/index.js the client entry point and rename the welcome image.
+- Update imports, lockfiles, CI, scripts and documentation. Preserve local databases, environment/SDK configuration, application IDs and stored avatar paths.
+- Android versionCode is 13.
+
 ## 1.6.0 — 2026-10-25
 
 - Split Web/native API adapters and share chapter, goal and fork workflows. Every Web operation that uses a model now carries the user's active provider settings.

@@ -6,7 +6,7 @@ The selected VFriend identity combines two companions into a V. The four origina
 
 Run `npm run icons` from the repository root after changing the JSON source. The Python generator has no external dependencies and writes:
 
-- `vfriend.svg` here and the Web favicon in `qa-app/frontend-vue/public/`.
+- `vfriend.svg` here and the Web favicon in `apps/client/public/`.
 - Android foreground, background, legacy rounded/round backgrounds and monochrome vector drawables.
 - API 24 legacy launcher fallbacks, API 26 adaptive icons and API 33 adaptive icons with a monochrome layer.
 

@@ -11,3 +11,4 @@
 - [v1.5.0](validation/v1.5.0.md)
 - [v1.5.1](validation/v1.5.1.md)
 - [v1.6.0](validation/v1.6.0.md)
+- [v1.6.1](validation/v1.6.1.md)
