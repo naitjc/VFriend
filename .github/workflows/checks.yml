@@ -23,8 +23,8 @@ jobs:
           cache: npm
           cache-dependency-path: |
             package-lock.json
-            qa-app/backend/package-lock.json
-            qa-app/frontend-vue/package-lock.json
+            apps/server/package-lock.json
+            apps/client/package-lock.json
       - run: npm run setup
       - run: npm run check
   android:
@@ -35,13 +35,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: qa-app/frontend-vue/package-lock.json
+          cache-dependency-path: apps/client/package-lock.json
       - uses: actions/setup-java@v6.1.0
         with:
           distribution: temurin
           java-version: 21
           cache: gradle
-      - run: npm --prefix qa-app/frontend-vue ci
-      - run: npm --prefix qa-app/frontend-vue run android:sync
+      - run: npm --prefix apps/client ci
+      - run: npm --prefix apps/client run android:sync
       - run: ./gradlew assembleDebug assembleParallel
-        working-directory: qa-app/frontend-vue/android
+        working-directory: apps/client/android

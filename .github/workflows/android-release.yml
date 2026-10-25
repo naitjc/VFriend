@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: qa-app/frontend-vue
+        working-directory: apps/client
 
     steps:
       - name: Check out source
@@ -26,8 +26,8 @@ jobs:
           cache: npm
           cache-dependency-path: |
             package-lock.json
-            qa-app/backend/package-lock.json
-            qa-app/frontend-vue/package-lock.json
+            apps/server/package-lock.json
+            apps/client/package-lock.json
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6.1.0
