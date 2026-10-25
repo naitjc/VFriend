@@ -11,6 +11,7 @@ source = source.replace('"pinia"', JSON.stringify(url('../../frontend-vue/node_m
   .replace("'rp-core'", JSON.stringify(url('../../shared/runtime.cjs')))
   .replace("'rp-prompt'", JSON.stringify(url('../../shared/prompt.cjs')))
   .replace('"../api/chat"', JSON.stringify(url('./helpers/browser-api.mjs')));
+source = source.replace(/"(\.\/actions\/[^"]+|\.\/runtime\.js)"/g, (_, relative) => JSON.stringify(url('../../frontend-vue/src/store/' + relative)));
 const load = Promise.all([import('data:text/javascript;base64,' + Buffer.from(source).toString('base64')), import(url('./helpers/browser-api.mjs'))]);
 async function fixture() {
   const [{ useChatStore }, { control }] = await load;
@@ -144,4 +145,27 @@ test('stop resolves the same request when actions receive different devtools pro
   };
   await trackedStore.sendMessage('你好');
   assert.equal(store.conversationHistory[1].delivery, 'stopped');
+});
+
+test('separate Pinia instances with the same conversation ID cannot cancel one another', { timeout: 2000 }, async () => {
+  const { store: first, control } = await fixture();
+  const { store: second } = await fixture();
+  const callbacks = new Map();
+  let bothStarted;
+  const ready = new Promise(resolve => { bothStarted = resolve; });
+  control.stream = (payload, cb) => new Promise((resolve, reject) => {
+    callbacks.set(payload.question, { cb, resolve });
+    cb.signal.addEventListener('abort', () => reject(new DOMException('已停止', 'AbortError')), { once: true });
+    if (callbacks.size === 2) bothStarted();
+  });
+  const one = first.sendMessage('first'); const two = second.sendMessage('second');
+  await ready;
+  first.stopGeneration();
+  assert.equal(callbacks.get('first').cb.signal.aborted, true);
+  assert.equal(callbacks.get('second').cb.signal.aborted, false);
+  callbacks.get('second').cb.onDone({ history: [{ role: 'assistant', content: '完成' }] });
+  callbacks.get('second').resolve();
+  await Promise.all([one, two]);
+  assert.equal(first.conversationHistory.at(-1).delivery, 'stopped');
+  assert.equal(second.conversationHistory.at(-1).delivery, 'complete');
 });

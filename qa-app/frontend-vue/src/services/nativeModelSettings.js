@@ -1,3 +1,4 @@
+import modelSettings from 'rp-model-settings'
 import { SecureStorage } from '@aparajita/capacitor-secure-storage'
 import { FIXED_NATIVE_MODEL } from './nativeModelConfig'
 
@@ -17,21 +18,10 @@ export async function loadNativeModelSettings() {
   }
 }
 
-export async function saveNativeModelSettings(settings) {
-  const apiURL = String(settings.apiURL || '').trim().replace(/\/$/, '')
-  const apiKey = String(settings.apiKey || '').trim()
-  let url
-  try {
-    url = new URL(apiURL)
-  } catch {
-    throw new Error('API 地址不是有效 URL')
-  }
-  if (url.protocol !== 'https:') {
-    throw new Error('API 地址必须使用 https://，避免密钥明文传输')
-  }
-  if (!apiKey) throw new Error('API Key 不能为空')
+export const normalizeNativeModelSettings = settings => modelSettings.normalizeModelSettings(settings, { requireModel: false })
 
-  const normalized = { apiURL, apiKey }
+export async function saveNativeModelSettings(settings) {
+  const normalized = normalizeNativeModelSettings(settings)
   await SecureStorage.set(STORAGE_KEY, normalized)
   return { ...normalized, model: FIXED_NATIVE_MODEL }
 }

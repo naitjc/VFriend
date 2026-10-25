@@ -1,3 +1,4 @@
+const { normalizeModelSettings } = require('../../../shared/modelSettings.cjs')
 const { AsyncLocalStorage } = require('node:async_hooks')
 
 const requestContext = new AsyncLocalStorage()
@@ -13,27 +14,10 @@ function parseModelConfig(headers = {}) {
     error.status = 400
     throw error
   }
-  if (apiURL.length > 2048 || apiKey.length > 4096 || model.length > 200) {
-    const error = new Error('模型配置内容过长')
-    error.status = 400
-    throw error
-  }
-
-  let url
   try {
-    url = new URL(apiURL)
-  } catch {
-    const error = new Error('模型 API 地址不是有效 URL')
-    error.status = 400
-    throw error
-  }
-  if (url.protocol !== 'https:') {
-    const error = new Error('模型 API 地址必须使用 https://')
-    error.status = 400
-    throw error
-  }
+    return Object.freeze(normalizeModelSettings({ apiURL, apiKey, model }))
+  } catch (error) { error.status = 400; throw error }
 
-  return Object.freeze({ apiURL, apiKey, model })
 }
 
 function modelConfigContext(req, res, next) {

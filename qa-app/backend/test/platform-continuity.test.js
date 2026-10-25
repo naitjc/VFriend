@@ -8,7 +8,8 @@ process.env.SQLITE_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rp-pl
 const web = require('../src/services/conversationStore');
 const url = relative => pathToFileURL(path.resolve(__dirname, relative)).href;
 let source = fs.readFileSync(path.resolve(__dirname, '../../frontend-vue/src/services/nativeConversationStore.js'), 'utf8');
-source = source.replace("'rp-archives'", JSON.stringify(url('../../shared/archives.cjs')))
+source = source.replace("'rp-snapshots'", JSON.stringify(url('../../shared/snapshots.cjs')))
+  .replace("'rp-archives'", JSON.stringify(url('../../shared/archives.cjs')))
   .replace("'rp-core'", JSON.stringify(url('../../shared/runtime.cjs')))
   .replace("'@capacitor-community/sqlite'", JSON.stringify(url('./helpers/native-sqlite.mjs')));
 const native = import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
@@ -114,4 +115,24 @@ test('Android serializes concurrent imports and consistent backup reads on its s
   assert.deepEqual(exported.conversations, backup.conversations);
   assert.ok(await store.getRelationship(first.relationshipId));
   assert.ok(await store.getRelationship(second.relationshipId));
+});
+
+test('Android restores a trash entry at most once under concurrent calls', async () => {
+  const store = await native;
+  const created = await store.createRelationship({ mode: 'free', relationshipTitle: '并发恢复测试', snapshot: snapshot() });
+  await store.deleteRelationship(created.relationship.id);
+  const entry = (await store.listTrash()).find(item => item.title === '并发恢复测试');
+  const results = await Promise.all([store.restoreArchive(entry.id), store.restoreArchive(entry.id)]);
+  assert.equal(results.filter(Boolean).length, 1);
+});
+test('Android closes a chapter once and rejects saves queued behind closure', async () => {
+  const store = await native;
+  const created = await store.createRelationship({ mode: 'story', goal: '找到星图', snapshot: snapshot() });
+  const results = await Promise.allSettled([
+    store.createNextChapter(created.conversation.id, { summary: '回顾' }),
+    store.createNextChapter(created.conversation.id, { summary: '重复回顾' }),
+  ]);
+  assert.equal(results.filter(item => item.status === 'fulfilled').length, 1);
+  assert.equal((await store.getRelationship(created.relationship.id)).chapters.length, 2);
+  await assert.rejects(store.updateConversation(created.conversation.id, { snapshot: snapshot() }), /只读/);
 });

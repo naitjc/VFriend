@@ -6,11 +6,15 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig({
   plugins: [vue()],
   resolve: { alias: {
+    'rp-model-settings': fileURLToPath(new URL('../shared/modelSettings.cjs', import.meta.url)),
+    'rp-snapshots': fileURLToPath(new URL('../shared/snapshots.cjs', import.meta.url)),
+    'rp-session': fileURLToPath(new URL('../shared/chatSession.cjs', import.meta.url)),
+    'rp-advisors': fileURLToPath(new URL('../shared/advisors.cjs', import.meta.url)),
     'rp-archives': fileURLToPath(new URL('../shared/archives.cjs', import.meta.url)),
     'rp-core': fileURLToPath(new URL('../shared/runtime.cjs', import.meta.url)),
     'rp-prompt': fileURLToPath(new URL('../shared/prompt.cjs', import.meta.url)),
   } },
-  optimizeDeps: { include: ['rp-core', 'rp-prompt', 'rp-archives'] },
+  optimizeDeps: { include: ['rp-core', 'rp-prompt', 'rp-archives', 'rp-session', 'rp-advisors', 'rp-snapshots', 'rp-model-settings'] },
   build: {
     commonjsOptions: { include: [/node_modules/, /shared/] },
     rollupOptions: {

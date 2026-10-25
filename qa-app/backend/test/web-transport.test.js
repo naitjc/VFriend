@@ -2,11 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-let source = fs.readFileSync(path.resolve(__dirname, '../../frontend-vue/src/api/chat.js'), 'utf8')
-  .replace('import { isNativeApp } from "../services/platform";', 'const isNativeApp = false;')
-  .replace('import { webModelHeaders } from "../services/webModelSettings";', 'const webModelHeaders = () => ({});')
-  .replace('import.meta.env.VITE_API_URL', JSON.stringify('http://fixture.local'));
-const loaded = import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const { pathToFileURL } = require('node:url');
+const loaded = import(pathToFileURL(path.resolve(__dirname, '../../frontend-vue/src/api/httpClient.js')).href)
+  .then(({ createHttpClient }) => createHttpClient({ baseURL: 'http://fixture.local' }));
+
 const originalFetch = global.fetch;
 test.after(() => { global.fetch = originalFetch; });
 
@@ -41,4 +40,25 @@ test('Web transport propagates handler errors and releases a still-open stream',
   }));
   await assert.rejects(sendMessageStream({}, { onError: message => { throw new Error(message); } }), /模拟断线/);
   assert.equal(cancelled, true);
+});
+
+test('JSON request deadline remains active while reading a stalled response body', async () => {
+  const { request } = await loaded;
+  global.fetch = async (_, options) => ({ ok: true, status: 200, json: () => new Promise((_, reject) => {
+    options.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+  }) });
+  await assert.rejects(request('/fixture', { timeoutMs: 10 }), /请求超时/);
+});
+test('JSON request composes caller cancellation with its own deadline', async () => {
+  const { request } = await loaded;
+  const controller = new AbortController();
+  global.fetch = async (_, options) => {
+    assert.notEqual(options.signal, controller.signal);
+    queueMicrotask(() => controller.abort());
+    return { ok: true, status: 200, json: () => new Promise((_, reject) => {
+      options.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+      if (options.signal.aborted) reject(new DOMException('aborted', 'AbortError'));
+    }) };
+  };
+  await assert.rejects(request('/fixture', { signal: controller.signal }), { name: 'AbortError' });
 });

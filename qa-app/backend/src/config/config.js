@@ -16,7 +16,6 @@ const config = {
   },
 
   validate() {
-    if (!this.apiKey) throw new Error("API_KEY 未配置，请在 .env 文件中设置。");
     let protocol;
     try {
       protocol = new URL(this.apiURL).protocol;

@@ -24,8 +24,14 @@ function prepareImport(input, uuid) {
       if (typeof row.title !== 'string' || typeof row.created_at !== 'string' || typeof row.updated_at !== 'string') fail();
     }
   }
+  const chaptersByRelationship = new Map();
+  for (const chapter of input.conversations) {
+    const chapters = chaptersByRelationship.get(chapter.relationship_id) || [];
+    chapters.push(chapter);
+    chaptersByRelationship.set(chapter.relationship_id, chapters);
+  }
   for (const row of input.relationships) {
-    const chapters = input.conversations.filter(chapter => chapter.relationship_id === row.id);
+    const chapters = chaptersByRelationship.get(row.id) || [];
     if (!['free', 'story'].includes(row.mode) || !chapters.length || !row.character_snapshot_json) fail();
     if (chapters.filter(chapter => chapter.status === 'open').length !== 1) fail();
     if (new Set(chapters.map(chapter => chapter.chapter_number)).size !== chapters.length) fail();

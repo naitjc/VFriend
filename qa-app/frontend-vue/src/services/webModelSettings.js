@@ -1,26 +1,9 @@
+import modelSettings from 'rp-model-settings'
 const STORAGE_KEY = 'chat-rp-web-model-settings'
 
 const EMPTY_SETTINGS = Object.freeze({ apiURL: '', apiKey: '', model: '' })
 
-const normalizeSettings = (settings = {}) => {
-  const apiURL = String(settings.apiURL || '').trim().replace(/\/$/, '')
-  const apiKey = String(settings.apiKey || '').trim()
-  const model = String(settings.model || '').trim()
-  let url
-
-  try {
-    url = new URL(apiURL)
-  } catch {
-    throw new Error('API 地址不是有效 URL')
-  }
-  if (url.protocol !== 'https:') {
-    throw new Error('API 地址必须使用 https://，避免密钥明文传输')
-  }
-  if (!apiKey) throw new Error('API Key 不能为空')
-  if (!model) throw new Error('模型名称不能为空')
-
-  return { apiURL, apiKey, model }
-}
+const normalizeSettings = settings => modelSettings.normalizeModelSettings(settings)
 
 export function loadWebModelSettings() {
   try {

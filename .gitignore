@@ -13,9 +13,9 @@ dist/
 build/
 
 # Local SQLite conversation data
-qa-app/backend/data/*.db
-qa-app/backend/data/*.db-shm
-qa-app/backend/data/*.db-wal
+qa-app/backend/data/
+/android-legacy-backups/
+__pycache__/
 
 # IDE
 .vscode/
@@ -31,3 +31,7 @@ Thumbs.db
 # Temp files
 *.tmp
 *.temp
+
+# Private Android signing material
+*.jks
+*.keystore

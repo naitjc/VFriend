@@ -1,5 +1,7 @@
 # VFriend
 
+<img src="design/brand/vfriend.svg" width="88" alt="VFriend Conversation V icon">
+
 **VFriend（Virtual Friend，虚拟伙伴）**，基于 Vue、Express 与 SQLite 的本地沉浸式角色聊天应用。每个角色可以拥有多个互相独立的聊天存档，并在创建时选择聊天模式。
 
 ## 核心能力
@@ -28,53 +30,31 @@
 
 ## 快速开始
 
-### 1. 启动后端
+在仓库根目录执行：
 
 ```bash
-cd qa-app/backend
-npm install
+npm run setup  # 首次安装两端锁定依赖
+npm run dev    # 同时启动 Web 和后端；Ctrl+C 同时停止
 ```
 
-创建 `.env`：
+访问 `http://127.0.0.1:5173/`。在“更多操作 → 模型 API 设置”填写 Web 会话配置；也可以在 `qa-app/backend/.env` 中设置默认 `API_KEY`、`API_BASE_URL`、`MODEL` 和 `PORT=8888`。不配置密钥也可以启动并管理已有存档。
 
-```env
-API_KEY=your_key_here
-API_BASE_URL=https://your-provider.example/v1
-MODEL=your-model
-PORT=8888
-```
+前端默认连接 `http://localhost:8888`，修改后端地址时设置 `VITE_API_URL`。仍可分别在 backend 和 frontend-vue 目录运行 `npm start`、`npm run dev`。
+
+## 验证与维护
 
 ```bash
-npm start
+npm run check  # 前端未定义引用检查、跨端回归测试、Web 生产构建
+npm run icons  # 从统一矢量源重新生成 Web / Android 图标，需要 Python 3
 ```
 
-### 2. 启动前端
-
-```bash
-cd qa-app/frontend-vue
-npm install
-npm run dev
-```
-
-默认访问地址为 `http://127.0.0.1:5173/`，前端默认连接 `http://localhost:8888`。如需修改后端地址，可设置 `VITE_API_URL`。
-
-## 验证
-
-```bash
-# 跨端回归测试（需先安装 backend 和 frontend-vue 两端依赖）
-cd qa-app/backend && npm test
-
-# 前端生产构建
-cd qa-app/frontend-vue && npm run build
-```
-
-后端还提供 `GET /health` 健康检查接口。
+后端提供 `GET /health`。主分支推送和 PR 会自动运行 Web/领域测试及两种 Android 构建。架构和验证边界见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，本次变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## Android 安装包
 
 Android 与 Web 共用 Vue 界面和聊天状态，但通过运行平台选择不同的数据与模型适配器：
 
-- Web 继续连接现有 Express 后端，使用后端 SQLite 与 `.env` 中的模型配置。
+- Web 连接 Express 后端，使用后端 SQLite，以及当前浏览器会话配置或 `.env` 默认模型配置。
 - Android 不需要部署本项目后端。聊天存档保存在手机 SQLite，API Key 保存在 Android KeyStore 支持的安全存储中，模型请求从手机直连用户填写的 OpenAI 兼容接口。
 - 两端默认使用各自独立的存档，不会互相覆盖；Android 仍需联网访问所配置的模型服务。
 
@@ -98,20 +78,20 @@ npm run android:apk
 qa-app/frontend-vue/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-该 APK 使用开发调试签名，适合直接安装测试；正式分发时应改用自己的 release keystore 签名。当前本地 Android 版本号为 `1.4.1`（versionCode `9`）。
+该 APK 使用开发调试签名，适合直接安装测试；正式分发时应改用自己的 release keystore 签名。当前本地 Android 版本号为 `1.5.0`（versionCode `10`）。
 
 ## 主要目录
 
 ```text
 qa-app/
-├── shared/                    # Web / Android 共用的提示词、记忆和关系规则
+├── shared/                    # 共用聊天编排、建议、快照、配置和备份规则
 ├── backend/
 │   ├── src/controllers/       # HTTP 与 SSE 请求处理
 │   ├── src/services/          # LLM、状态、提示词、历史与存档服务
 │   └── test/                  # Node 内置测试
 └── frontend-vue/
     ├── src/components/        # 页面与交互组件
-    ├── src/store/             # Pinia 状态和持久化协调
+    ├── src/store/             # Pinia 状态、按职责拆分的 actions 和实例隔离运行资源
     ├── src/api/               # Web / Android 平台适配入口
     ├── src/services/          # Android SQLite、模型和安全配置实现
     ├── android/               # Capacitor Android 原生工程
@@ -124,7 +104,7 @@ qa-app/
 - 聊天接口限制单条消息与历史长度，并对请求进行速率限制。
 - 模型输出 Markdown 在渲染前经过 DOMPurify 清理。
 - Android 清单关闭普通系统备份；模型 API Key 不会写入源码、Web 存储或 APK 配置。
-- 删除存档不可恢复，界面会在执行前要求确认。
+- 删除存档会进入回收站，可以恢复为独立副本；原有 ID 不会覆盖。
 
 ### Android 与旧版签名兼容
 

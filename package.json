@@ -1,0 +1,21 @@
+{
+  "name": "vfriend-project",
+  "private": true,
+  "version": "1.5.0",
+  "description": "VFriend Web and Android development entry points",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "setup": "npm --prefix qa-app/backend ci && npm --prefix qa-app/frontend-vue ci",
+    "dev": "node scripts/dev.mjs",
+    "start": "node scripts/dev.mjs",
+    "test": "npm --prefix qa-app/backend test",
+    "build": "npm --prefix qa-app/frontend-vue run build",
+    "check": "npm run lint && npm test && npm run build",
+    "android:apk": "npm --prefix qa-app/frontend-vue run android:apk",
+    "android:parallel": "npm --prefix qa-app/frontend-vue run android:parallel",
+    "icons": "python3 scripts/generate_icons.py",
+    "lint": "npm --prefix qa-app/frontend-vue run lint"
+  }
+}

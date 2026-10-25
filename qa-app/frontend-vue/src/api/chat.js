@@ -1,38 +1,13 @@
+import { createHttpClient } from "./httpClient.js";
 import { isNativeApp } from "../services/platform";
 import { webModelHeaders } from "../services/webModelSettings";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8888";
-const REQUEST_TIMEOUT_MS = 15000;
 const nativeStore = () => import("../services/nativeConversationStore");
 const nativeRuntime = () => import("../services/nativeLlmRuntime");
 
-async function request(path, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  let response;
-  try {
-    response = await fetch(`${API_URL}${path}`, {
-      ...options,
-      signal: options.signal || controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
-    });
-  } catch (error) {
-    if (error.name === "AbortError") throw new Error("请求超时，请稍后重试");
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body?.error?.message || `HTTP ${response.status}`);
-  }
-  if (response.status === 204) return null;
-  return response.json();
-}
+const http = createHttpClient({ baseURL: API_URL, modelHeaders: webModelHeaders });
+export const request = http.request;
 
 export async function listConversations() {
   if (isNativeApp) {
@@ -123,7 +98,7 @@ export async function createNextChapter(relationshipId, payload) {
   }
   return request(
     `/relationships/${encodeURIComponent(relationshipId)}/chapters`,
-    {
+    { timeoutMs: 65000,
       method: "POST",
       body: JSON.stringify(payload),
     },
@@ -148,7 +123,7 @@ export async function requestChapterSuggestion(relationshipId, payload) {
   }
   return request(
     `/relationships/${encodeURIComponent(relationshipId)}/chapter-suggestion`,
-    {
+    { timeoutMs: 35000,
       method: "POST",
       body: JSON.stringify(payload),
     },
@@ -174,7 +149,7 @@ export async function requestGoalSuggestion(relationshipId, payload) {
   }
   return request(
     `/relationships/${encodeURIComponent(relationshipId)}/goal-suggestion`,
-    {
+    { timeoutMs: 35000,
       method: "POST",
       body: JSON.stringify(payload),
     },
@@ -198,7 +173,7 @@ export async function forkConversation(id, payload = {}) {
     }
     return store.forkConversation(id, { ...payload, summary });
   }
-  return request(`/conversations/${encodeURIComponent(id)}/fork`, {
+  return request(`/conversations/${encodeURIComponent(id)}/fork`, { timeoutMs: 65000,
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -275,70 +250,11 @@ export async function sendMessageStream(
       onError,
     });
   }
-  const response = await fetch(`${API_URL}/qa/stream`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...webModelHeaders(),
-    },
-    body: JSON.stringify(payload),
-    signal,
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `HTTP ${response.status}`);
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let eventBuffer = "";
-  let completed = false;
-  let streamError = "";
-
-  try {
-    while (!completed && !streamError) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      eventBuffer += decoder.decode(value, { stream: true });
-      const blocks = eventBuffer.split("\n\n");
-      eventBuffer = blocks.pop();
-      for (const block of blocks) {
-        let eventType = "message";
-        let dataLine = "";
-        for (const line of block.split("\n")) {
-          if (line.startsWith("event: ")) eventType = line.slice(7).trim();
-          if (line.startsWith("data: ")) dataLine = line.slice(6).trim();
-        }
-        if (!dataLine) continue;
-        let data;
-        try { data = JSON.parse(dataLine); } catch { continue; }
-        if (eventType === "chunk") onChunk?.(data.text);
-        if (eventType === "reply") onReply?.(data);
-        if (eventType === "progress") onProgress?.(data);
-        if (eventType === "state") onState?.(data);
-        if (eventType === "done") {
-          completed = true;
-          onDone?.(data);
-        }
-        if (eventType === "error") {
-          streamError = data.message || "生成回复失败";
-          onError?.(streamError);
-        }
-        if (completed || streamError) break;
-      }
-    }
-  } finally {
-    await reader.cancel().catch(() => {});
-    reader.releaseLock();
-  }
-
-  if (streamError) throw new Error(streamError);
-  if (!completed) throw new Error("连接提前结束，请重试");
+  return http.sendMessageStream(payload, { onChunk, onState, onDone, onError, onProgress, onReply, signal });
 }
 
 export async function testWebModelConnection(settings) {
-  await request("/model/test", {
+  await request("/model/test", { timeoutMs: 20000,
     method: "POST",
     headers: webModelHeaders(settings),
     body: JSON.stringify({}),
@@ -351,7 +267,7 @@ export async function previewCharacter(characterSettings, question) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 65000);
   try {
-    return (await request('/character/preview', {
+    return (await request('/character/preview', { timeoutMs: 65000,
       method: 'POST', signal: controller.signal,
       headers: webModelHeaders(),
       body: JSON.stringify({ characterSettings, question }),

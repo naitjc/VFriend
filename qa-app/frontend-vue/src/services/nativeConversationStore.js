@@ -1,3 +1,5 @@
+import snapshots from 'rp-snapshots'
+const { relationshipRuntimeFromSnapshot, checkpointFromSnapshot, prepareSnapshotForChapter } = snapshots
 import archives from 'rp-archives'
 import runtimeRules from 'rp-core'
 const { initialRelationshipState } = runtimeRules
@@ -43,49 +45,6 @@ function validateSnapshot(snapshot) {
   }
 }
 
-function stripRuntimeState(characterSettings = {}) {
-  const character = clone(characterSettings) || {}
-  delete character.relationshipState
-  delete character.memory
-  return character
-}
-
-function relationshipRuntimeFromSnapshot(snapshot = {}) {
-  const settings = snapshot.characterSettings || {}
-  const defaults = snapshot.characterDefaults || {}
-  return {
-    character: stripRuntimeState(settings),
-    relationshipState: clone(settings.relationshipState ?? null),
-    memory: clone(settings.memory ?? null),
-    initialState: clone(defaults.relationshipState ?? settings.relationshipState ?? null),
-    initialMemory: clone(defaults.memory ?? settings.memory ?? null),
-  }
-}
-
-function checkpointFromSnapshot(snapshot, summary = '') {
-  const runtime = relationshipRuntimeFromSnapshot(snapshot)
-  return {
-    schemaVersion: 1,
-    relationshipState: runtime.relationshipState,
-    memory: runtime.memory,
-    summary: String(summary || ''),
-  }
-}
-
-function prepareSnapshotForChapter(sourceSnapshot, relationshipId, chapterNumber, summary = '') {
-  const snapshot = clone(sourceSnapshot) || {}
-  snapshot.schemaVersion = 2
-  snapshot.relationshipId = relationshipId
-  snapshot.chapterNumber = chapterNumber
-  snapshot.conversationHistory = []
-  snapshot.apiHistory = summary
-    ? [{ role: 'system', content: `[上一章提要] ${String(summary).trim()}` }]
-    : []
-  snapshot.bookmarkedIndices = []
-  snapshot.searchQuery = ''
-  snapshot.showSearch = false
-  return snapshot
-}
 
 async function getDatabase() {
   if (databasePromise) return databasePromise
@@ -341,6 +300,8 @@ export async function updateConversation(id, input = {}) {
   const characterName = runtime.character.basicInfo?.name || input.characterName || existing.characterName
   const characterId = runtime.character.id || characterName
   await inTransaction(async (db) => {
+    const [current] = (await db.query('SELECT status FROM conversations WHERE id = ?', [id])).values || []
+    if (current?.status !== 'open') throw new Error('过去章节为只读；如需继续，请创建分支故事')
     await db.run(
       `UPDATE conversations SET title = ?, title_is_custom = ?, character_name = ?,
        preview = ?, checkpoint_json = ?, snapshot_json = ?, updated_at = ? WHERE id = ?`,
@@ -369,7 +330,7 @@ export async function updateConversation(id, input = {}) {
 }
 
 export async function createNextChapter(sourceConversationId, input = {}) {
-  const source = await getConversation(sourceConversationId)
+  let source = await getConversation(sourceConversationId)
   if (!source) throw new Error('源章节不存在')
   if (source.status !== 'open') throw new Error('只有当前开放章节可以开启下一章')
   const relationship = await getRelationship(source.relationshipId)
@@ -378,13 +339,17 @@ export async function createNextChapter(sourceConversationId, input = {}) {
   const nextNumber = source.chapterNumber + 1
   const conversationId = uuid()
   const now = new Date().toISOString()
-  const nextSnapshot = prepareSnapshotForChapter(
+  let nextSnapshot = prepareSnapshotForChapter(
     source.snapshot,
     source.relationshipId,
     nextNumber,
     summary,
   )
   await inTransaction(async (db) => {
+    const [current] = (await db.query('SELECT * FROM conversations WHERE id = ?', [source.id])).values || []
+    if (current?.status !== 'open') throw new Error('只有当前开放章节可以开启下一章')
+    source = normalizeConversation(current, true)
+    nextSnapshot = prepareSnapshotForChapter(source.snapshot, source.relationshipId, nextNumber, summary)
     await db.run(
       `UPDATE conversations SET status = 'closed', summary = ?, checkpoint_json = ?,
        updated_at = ?, closed_at = ? WHERE id = ?`,
@@ -448,11 +413,11 @@ export async function renameConversation(id, title) {
   if (!existing) return null
   const normalized = normalizedTitle(title, '')
   if (!normalized) throw new Error('章节标题不能为空')
-  const db = await getDatabase()
-  await db.run(
+  await inTransaction(db => db.run(
     'UPDATE conversations SET title = ?, title_is_custom = 1, updated_at = ? WHERE id = ?',
     [normalized, new Date().toISOString(), id],
-  )
+    false,
+  ))
   return getConversation(id)
 }
 
@@ -461,11 +426,11 @@ export async function renameRelationship(id, title) {
   if (!existing) return null
   const normalized = normalizedTitle(title, '')
   if (!normalized) throw new Error('存档名称不能为空')
-  const db = await getDatabase()
-  await db.run(
+  await inTransaction(db => db.run(
     'UPDATE relationships SET title = ?, title_is_custom = 1, updated_at = ? WHERE id = ?',
     [normalized, new Date().toISOString(), id],
-  )
+    false,
+  ))
   return getRelationship(id)
 }
 
@@ -493,23 +458,25 @@ export async function updateRelationshipSettings(id, input = {}) {
     }
   }
 
-  const db = await getDatabase()
-  await db.run(
+  await inTransaction(db => db.run(
     `UPDATE relationships SET goal = ?, goal_status = ?, goal_achieved_at = ?,
      goal_resolution = ?, updated_at = ? WHERE id = ?`,
     [goal, goalStatus, goalAchievedAt, goalResolution, new Date().toISOString(), id],
-  )
+    false,
+  ))
   return getRelationship(id)
 }
 
 export async function deleteRelationship(id) {
-  if (!(await getRelationship(id))) return false
-  const data = await exportArchives(id)
-  await inTransaction(async db => {
-    await db.run('INSERT INTO archive_trash (id, title, deleted_at, bundle_json) VALUES (?, ?, ?, ?)', [uuid(), data.relationships[0].title, new Date().toISOString(), JSON.stringify(data)], false)
+  return inTransaction(async db => {
+    const relationshipRows = (await db.query('SELECT * FROM relationships WHERE id = ?', [id])).values || []
+    if (!relationshipRows.length) return false
+    const conversationRows = (await db.query('SELECT * FROM conversations WHERE relationship_id = ?', [id])).values || []
+    const data = archives.bundle(relationshipRows, conversationRows)
+    await db.run('INSERT INTO archive_trash (id, title, deleted_at, bundle_json) VALUES (?, ?, ?, ?)', [uuid(), relationshipRows[0].title, new Date().toISOString(), JSON.stringify(data)], false)
     await db.run('DELETE FROM relationships WHERE id = ?', [id], false)
+    return true
   })
-  return true
 }
 
 export async function deleteConversation(id) {
@@ -540,12 +507,12 @@ export async function listTrash() {
   return rows('SELECT id, title, deleted_at AS deletedAt FROM archive_trash ORDER BY deleted_at DESC')
 }
 export async function restoreArchive(id) {
-  const [row] = await rows('SELECT bundle_json FROM archive_trash WHERE id = ?', [id])
-  if (!row) return null
-  const data = archives.prepareImport(JSON.parse(row.bundle_json), uuid)
-  await inTransaction(async db => {
+  return inTransaction(async db => {
+    const [row] = (await db.query('SELECT bundle_json FROM archive_trash WHERE id = ?', [id])).values || []
+    if (!row) return null
+    const data = archives.prepareImport(JSON.parse(row.bundle_json), uuid)
     await insertArchives(db, data)
     await db.run('DELETE FROM archive_trash WHERE id = ?', [id], false)
+    return { relationshipId: data.relationships[0].id }
   })
-  return { relationshipId: data.relationships[0].id }
 }

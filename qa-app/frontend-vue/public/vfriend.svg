@@ -1,12 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="friend" x2="1" y2="1">
-      <stop stop-color="#625ad4"/>
-      <stop offset="1" stop-color="#9d72fb"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="18" fill="url(#friend)"/>
-  <circle cx="21" cy="20" r="5" fill="#fff"/>
-  <circle cx="43" cy="20" r="5" fill="#fff"/>
-  <path d="m18 32 14 17 14-17" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" role="img" aria-label="VFriend">
+<defs>
+<linearGradient id="background" x2="0.3" y2="1"><stop stop-color="#5200b9"/><stop offset="1" stop-color="#1b0758"/></linearGradient>
+<linearGradient id="emblem" x1="0.2" x2="0.8" y2="1"><stop stop-color="#ffffff"/><stop offset="0.65" stop-color="#e6dcff"/><stop offset="1" stop-color="#b295f6"/></linearGradient>
+</defs>
+<rect width="1254" height="1254" rx="260" fill="url(#background)"/>
+<path d="M627,258 C790,258 917,329 965,454 C903,368 833,346 769,388 C713,424 670,526 649,579 C639,608 622,609 612,582 C574,498 535,414 481,380 C411,335 335,367 290,454 C338,329 464,258 627,258 Z M290,454 C340,391 399,431 444,511 L553,714 C591,788 637,800 681,722 L801,507 C844,431 909,391 965,454 C987,498 997,548 997,601 C997,785 899,899 711,901 L542,901 C490,903 465,949 382,978 C354,988 349,975 356,947 C383,852 380,857 335,815 C280,760 257,686 257,601 C257,548 267,498 290,454 Z" fill="url(#emblem)" fill-rule="evenodd"/>
 </svg>
