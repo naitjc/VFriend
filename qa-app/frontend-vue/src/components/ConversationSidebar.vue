@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { DocumentAdd, EditPen, MoreFilled, Plus } from '@element-plus/icons-vue'
+import { DocumentAdd, MoreFilled, Plus } from '@element-plus/icons-vue'
 import { useChatStore } from '../store/chatStore'
 
 const emit = defineEmits(['selected'])

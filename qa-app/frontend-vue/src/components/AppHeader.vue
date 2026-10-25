@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, inject, computed, defineAsyncComponent, onMounted, watch } from 'vue'
+import { ref, inject, computed, defineAsyncComponent, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useChatStore } from '../store/chatStore'
 import {

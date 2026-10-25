@@ -1,21 +1,27 @@
 {
   "name": "vfriend-project",
   "private": true,
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "VFriend Web and Android development entry points",
   "engines": {
-    "node": ">=22.5.0"
+    "node": "^22.13.0 || >=24.0.0"
   },
   "scripts": {
-    "setup": "npm --prefix qa-app/backend ci && npm --prefix qa-app/frontend-vue ci",
+    "setup": "npm ci && npm --prefix qa-app/backend ci && npm --prefix qa-app/frontend-vue ci",
     "dev": "node scripts/dev.mjs",
-    "start": "node scripts/dev.mjs",
+    "start": "npm --prefix qa-app/backend start",
     "test": "npm --prefix qa-app/backend test",
     "build": "npm --prefix qa-app/frontend-vue run build",
-    "check": "npm run lint && npm test && npm run build",
+    "check": "npm run check:repo && npm run lint && npm test && npm run build",
     "android:apk": "npm --prefix qa-app/frontend-vue run android:apk",
     "android:parallel": "npm --prefix qa-app/frontend-vue run android:parallel",
     "icons": "python3 scripts/generate_icons.py",
-    "lint": "npm --prefix qa-app/frontend-vue run lint"
+    "lint": "eslint qa-app scripts",
+    "check:repo": "node scripts/check-repository.mjs && python3 scripts/generate_icons.py --check"
+  },
+  "devDependencies": {
+    "eslint": "^10.13.0",
+    "eslint-plugin-vue": "^10.11.1",
+    "globals": "^16.5.0"
   }
 }

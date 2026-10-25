@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build Web and Android brand resources from one vector source."""
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,11 +14,18 @@ res = ROOT / 'qa-app/frontend-vue/android/app/src/main/res'
 namespace = 'xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt"'
 vector = f'<vector {namespace} android:width="108dp" android:height="108dp" android:viewportWidth="{size}" android:viewportHeight="{size}">'
 definitions = []
+check_only = '--check' in sys.argv
+stale = []
 
 
 def write(path, content):
+    expected = content + '\n'
+    if check_only:
+        if not path.exists() or path.read_text(encoding='utf-8') != expected:
+            stale.append(str(path.relative_to(ROOT)))
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content + '\n', encoding='utf-8')
+    path.write_text(expected, encoding='utf-8')
 
 
 def resource(relative, content):
@@ -82,4 +90,6 @@ for round_icon in [False, True]:
         monochrome = '<monochrome android:drawable="@drawable/vfriend_monochrome"/>' if api >= 33 else ''
         resource(f'mipmap-anydpi-v{api}/' + name, f'<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"><background android:drawable="@drawable/vfriend_background"/><foreground android:drawable="@drawable/vfriend_foreground"/>{monochrome}</adaptive-icon>')
 resource('values/ic_launcher_background.xml', f'<resources><color name="ic_launcher_background">{spec["splashColor"]}</color></resources>')
-print('Generated VFriend Web, legacy, adaptive and monochrome icons.')
+if stale:
+    raise SystemExit('Generated icons are out of date; run npm run icons:\n' + '\n'.join(stale))
+print('Verified generated icons.' if check_only else 'Generated VFriend Web, legacy, adaptive and monochrome icons.')

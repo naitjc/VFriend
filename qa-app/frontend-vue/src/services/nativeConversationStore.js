@@ -1,3 +1,5 @@
+import relationships from 'rp-relationships'
+const { normalizeGoal: normalizedGoal, normalizeMode: normalizedMode, patchStoryGoal } = relationships
 import snapshots from 'rp-snapshots'
 const { relationshipRuntimeFromSnapshot, checkpointFromSnapshot, prepareSnapshotForChapter } = snapshots
 import archives from 'rp-archives'
@@ -26,19 +28,6 @@ const uuid = () => globalThis.crypto?.randomUUID?.()
 const normalizedTitle = (value, fallback) => (
   String(value || fallback).trim().slice(0, 80) || fallback
 )
-const normalizedGoal = (value) => String(value || '').trim().slice(0, 500)
-
-function normalizedGoalStatus(value) {
-  if (value === 'active' || value === 'achieved') return value
-  throw new Error('目标状态必须是 active 或 achieved')
-}
-
-function normalizedMode(value) {
-  const mode = value == null ? 'free' : String(value).trim()
-  if (mode === 'free' || mode === 'story') return mode
-  throw new Error('聊天模式必须是 free 或 story')
-}
-
 function validateSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
     throw new Error('会话快照不能为空')
@@ -435,36 +424,20 @@ export async function renameRelationship(id, title) {
 }
 
 export async function updateRelationshipSettings(id, input = {}) {
-  const relationship = await getRelationship(id)
-  if (!relationship) return null
-  if (relationship.mode !== 'story') throw new Error('自由模式没有故事目标')
-  const goalWasProvided = Object.prototype.hasOwnProperty.call(input, 'goal')
-  const goal = goalWasProvided ? normalizedGoal(input.goal) : relationship.goal
-  if (!goal) throw new Error('故事目标不能为空')
-  const goalChanged = goalWasProvided && goal !== relationship.goal
-  let goalStatus = goalChanged ? 'active' : relationship.goalStatus
-  let goalAchievedAt = goalChanged ? null : relationship.goalAchievedAt
-  let goalResolution = goalChanged ? '' : relationship.goalResolution
-
-  if (Object.prototype.hasOwnProperty.call(input, 'goalStatus')) {
-    goalStatus = normalizedGoalStatus(input.goalStatus)
-    if (goalStatus === 'achieved') {
-      goalAchievedAt = relationship.goalAchievedAt || new Date().toISOString()
-      goalResolution = String(input.goalResolution || '').trim().slice(0, 500)
-      if (!goalResolution) throw new Error('确认目标达成时需要提供判断依据')
-    } else {
-      goalAchievedAt = null
-      goalResolution = ''
-    }
-  }
-
-  await inTransaction(db => db.run(
-    `UPDATE relationships SET goal = ?, goal_status = ?, goal_achieved_at = ?,
-     goal_resolution = ?, updated_at = ? WHERE id = ?`,
-    [goal, goalStatus, goalAchievedAt, goalResolution, new Date().toISOString(), id],
-    false,
-  ))
-  return getRelationship(id)
+  const updated = await inTransaction(async db => {
+    const [row] = (await db.query('SELECT * FROM relationships WHERE id = ?', [id])).values || []
+    if (!row) return false
+    const relationship = await normalizeRelationship(row, false)
+    const { goal, goalStatus, goalAchievedAt, goalResolution } = patchStoryGoal(relationship, input)
+    await db.run(
+      `UPDATE relationships SET goal = ?, goal_status = ?, goal_achieved_at = ?,
+       goal_resolution = ?, updated_at = ? WHERE id = ?`,
+      [goal, goalStatus, goalAchievedAt, goalResolution, new Date().toISOString(), id],
+      false,
+    )
+    return true
+  })
+  return updated ? getRelationship(id) : null
 }
 
 export async function deleteRelationship(id) {

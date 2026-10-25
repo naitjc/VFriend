@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.0 — 2026-10-25
+
+- Split Web/native API adapters and share chapter, goal and fork workflows. Every Web operation that uses a model now carries the user's active provider settings.
+- Enforce matching chapter ownership and open/story status on both platforms before invoking model work. Merge native goal updates inside the SQLite transaction and share goal-state rules.
+- Reject structurally invalid backup records and impossible chapter ordering before writes. Deduplicate imported custom characters.
+- Use relative API URLs by default, a Vite development proxy, and a production `npm start` that serves the built Web app with Express.
+- Centralize lint tools and lockfile at the root; check backend, frontend, shared modules and scripts. Verify manifest versions, generated icons and documentation links in CI.
+- Organize guides and historical validation reports under docs, add configuration examples and contributor instructions, and remove unused code and Capacitor example tests.
+- Keep Companion V, the restored welcome reminder, data keys and application IDs. Android versionCode is 12.
+
 ## 1.5.1 — 2026-10-25
 
 - Adopt Companion V after the user selected the two-companion concept. Match the Web icon, adaptive/legacy Android launchers, monochrome layer and splash palette with one vector source.

@@ -169,3 +169,15 @@ test('separate Pinia instances with the same conversation ID cannot cancel one a
   assert.equal(first.conversationHistory.at(-1).delivery, 'stopped');
   assert.equal(second.conversationHistory.at(-1).delivery, 'complete');
 });
+
+test('backup import deduplicates custom characters within one bundle and clones their data', async () => {
+  const { createArchivesActions } = await import(url('../../frontend-vue/src/store/actions/archives.js'));
+  const actions = createArchivesActions({ importArchivesApi: async () => ({}), listRelationshipsApi: async () => [], cloneValue: structuredClone });
+  global.localStorage.setItem = () => {};
+  const state = { customCharacters: [], _setRelationships() {} };
+  const character = { id: 'same', basicInfo: { name: '测试角色' } };
+  await actions.importBackup.call(state, { customCharacters: [character, character, { id: '', basicInfo: { name: '无效角色' } }] });
+  assert.equal(state.customCharacters.length, 1);
+  character.basicInfo.name = '外部变更';
+  assert.equal(state.customCharacters[0].basicInfo.name, '测试角色');
+});

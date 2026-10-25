@@ -7,7 +7,7 @@ import MessageBubble from './chat/MessageBubble.vue'
 import MessageInput from './chat/MessageInput.vue'
 import MemoryProgress from './MemoryProgress.vue'
 
-const props = defineProps({
+defineProps({
   isMobile: { type: Boolean, default: false },
 })
 

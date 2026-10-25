@@ -1,6 +1,5 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const loaded = import(pathToFileURL(path.resolve(__dirname, '../../frontend-vue/src/api/httpClient.js')).href)

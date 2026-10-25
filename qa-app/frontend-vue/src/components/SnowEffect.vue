@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
+import { onMounted, onUnmounted, ref, computed } from 'vue';
 import { useChatStore } from '../store/chatStore';
 
 const canvasRef = ref(null);

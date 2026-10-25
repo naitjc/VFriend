@@ -7,6 +7,7 @@ const TRASH_SCHEMA = 'CREATE TABLE IF NOT EXISTS archive_trash (id TEXT PRIMARY 
 const insertSQL = table => `INSERT INTO ${table} (${COLUMNS[table].join(', ')}) VALUES (${COLUMNS[table].map(() => '?').join(', ')})`;
 const values = (table, row) => COLUMNS[table].map(key => row[key] ?? null);
 const bundle = (relationships, conversations) => ({ format: 'chat-rp-backup', version: 1, exportedAt: new Date().toISOString(), relationships, conversations });
+const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 function prepareImport(input, uuid) {
   const fail = () => { const error = new Error('备份格式无效或章节数据不完整，未导入任何内容'); error.status = 400; throw error; };
   if (input?.format !== 'chat-rp-backup' || input.version !== 1 || !Array.isArray(input.relationships) || !Array.isArray(input.conversations)) fail();
@@ -21,6 +22,7 @@ function prepareImport(input, uuid) {
         if (value != null && !['string', 'number'].includes(typeof value)) fail();
         if (key.endsWith('_json') && value != null) { try { JSON.parse(value); } catch { fail(); } }
       }
+      if (table === 'relationships' && !isObject(JSON.parse(row.character_snapshot_json || 'null'))) fail();
       if (typeof row.title !== 'string' || typeof row.created_at !== 'string' || typeof row.updated_at !== 'string') fail();
     }
   }
@@ -35,6 +37,7 @@ function prepareImport(input, uuid) {
     if (!['free', 'story'].includes(row.mode) || !chapters.length || !row.character_snapshot_json) fail();
     if (chapters.filter(chapter => chapter.status === 'open').length !== 1) fail();
     if (new Set(chapters.map(chapter => chapter.chapter_number)).size !== chapters.length) fail();
+    if (chapters.find(chapter => chapter.status === 'open').chapter_number !== chapters.reduce((max, chapter) => Math.max(max, chapter.chapter_number), 0)) fail();
     result.relationships.push({ ...row, id: ids.relationships.get(row.id),
       forked_from_relationship_id: ids.relationships.get(row.forked_from_relationship_id) || null,
       forked_from_conversation_id: ids.conversations.get(row.forked_from_conversation_id) || null,
@@ -45,7 +48,10 @@ function prepareImport(input, uuid) {
     if (!relationshipId || !['open', 'closed'].includes(row.status) || !Number.isInteger(row.chapter_number) || row.chapter_number < 1) fail();
     let snapshot;
     try { snapshot = JSON.parse(row.snapshot_json); } catch { fail(); }
-    if (!snapshot || !snapshot.characterSettings?.basicInfo?.name || !Array.isArray(snapshot.conversationHistory) || !Array.isArray(snapshot.apiHistory)) fail();
+    if (!isObject(snapshot) || typeof snapshot.characterSettings?.basicInfo?.name !== 'string' || !snapshot.characterSettings.basicInfo.name.trim() || !Array.isArray(snapshot.conversationHistory) || !Array.isArray(snapshot.apiHistory)) fail();
+    for (const history of [snapshot.conversationHistory, snapshot.apiHistory]) {
+      if (!history.every(message => isObject(message) && typeof message.role === 'string' && (typeof message.content === 'string' || Array.isArray(message.content)))) fail();
+    }
     snapshot.relationshipId = relationshipId;
     snapshot.chapterNumber = row.chapter_number;
     result.conversations.push({ ...row, id: ids.conversations.get(row.id), relationship_id: relationshipId, snapshot_json: JSON.stringify(snapshot) });

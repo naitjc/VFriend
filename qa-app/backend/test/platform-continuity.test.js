@@ -8,7 +8,8 @@ process.env.SQLITE_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rp-pl
 const web = require('../src/services/conversationStore');
 const url = relative => pathToFileURL(path.resolve(__dirname, relative)).href;
 let source = fs.readFileSync(path.resolve(__dirname, '../../frontend-vue/src/services/nativeConversationStore.js'), 'utf8');
-source = source.replace("'rp-snapshots'", JSON.stringify(url('../../shared/snapshots.cjs')))
+source = source.replace("'rp-relationships'", JSON.stringify(url('../../shared/relationships.cjs')))
+  .replace("'rp-snapshots'", JSON.stringify(url('../../shared/snapshots.cjs')))
   .replace("'rp-archives'", JSON.stringify(url('../../shared/archives.cjs')))
   .replace("'rp-core'", JSON.stringify(url('../../shared/runtime.cjs')))
   .replace("'@capacitor-community/sqlite'", JSON.stringify(url('./helpers/native-sqlite.mjs')));
@@ -136,3 +137,31 @@ test('Android closes a chapter once and rejects saves queued behind closure', as
   assert.equal((await store.getRelationship(created.relationship.id)).chapters.length, 2);
   await assert.rejects(store.updateConversation(created.conversation.id, { snapshot: snapshot() }), /只读/);
 });
+
+for (const [name, platform] of [['Web', Promise.resolve(web)], ['Android SQL adapter', native]]) {
+  test(`${name}: concurrent goal edits retain the new goal when confirming achievement`, async () => {
+    const store = await platform;
+    const created = await store.createRelationship({ mode: 'story', goal: '旧目标', snapshot: snapshot() });
+    await Promise.all([
+      store.updateRelationshipSettings(created.relationship.id, { goal: '新目标' }),
+      store.updateRelationshipSettings(created.relationship.id, { goalStatus: 'achieved', goalResolution: '新的证据' }),
+    ]);
+    const result = await store.getRelationship(created.relationship.id);
+    assert.equal(result.goal, '新目标');
+    assert.equal(result.goalStatus, 'achieved');
+  });
+  test(`${name}: invalid backup topology and malformed character snapshots never import partially`, async () => {
+    const store = await platform;
+    const created = await store.createRelationship({ mode: 'story', goal: '目标', snapshot: snapshot() });
+    await store.createNextChapter(created.conversation.id, { summary: '前章' });
+    const backup = await store.exportArchives(created.relationship.id);
+    const before = (await store.listRelationships()).length;
+    const invalid = structuredClone(backup);
+    invalid.conversations[0].status = 'open'; invalid.conversations[1].status = 'closed';
+    await assert.rejects(async () => store.importArchives(invalid), /备份格式/);
+    const malformed = structuredClone(backup);
+    malformed.relationships[0].character_snapshot_json = '[]';
+    await assert.rejects(async () => store.importArchives(malformed), /备份格式/);
+    assert.equal((await store.listRelationships()).length, before);
+  });
+}

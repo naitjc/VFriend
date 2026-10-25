@@ -26,3 +26,16 @@ test('HTTP rejects malformed chat and invalid backups before any model request',
     assert.equal(typeof (await response.json()).error.message, 'string');
   }
 });
+
+test('HTTP story workflow validates ownership and rejects closed sources without invoking a model', async () => {
+  const snapshot = { characterSettings: { basicInfo: { name: '流程测试角色' } }, conversationHistory: [], apiHistory: [] };
+  const create = async () => (await (await fetch(base + '/relationships', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'story', goal: '目标', snapshot }) })).json());
+  const first = await create(); const second = await create();
+  const post = (relationship, payload, suffix = 'chapters') => fetch(`${base}/relationships/${relationship.id}/${suffix}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  assert.equal((await post(first.relationship, { sourceConversationId: second.conversation.id, summary: '已提供摘要' })).status, 400);
+  const next = await post(first.relationship, { sourceConversationId: first.conversation.id, summary: '已提供摘要' });
+  assert.equal(next.status, 201);
+  assert.equal((await next.json()).conversation.chapterNumber, 2);
+  assert.equal((await post(first.relationship, { sourceConversationId: first.conversation.id }, 'chapter-suggestion')).status, 409);
+  assert.equal((await post(first.relationship, {}, 'goal-suggestion')).status, 404);
+});

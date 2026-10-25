@@ -1,3 +1,4 @@
+const { normalizeGoal: normalizedGoal, normalizeMode: normalizedMode, patchStoryGoal } = require('../../../shared/relationships.cjs');
 const { relationshipRuntimeFromSnapshot, checkpointFromSnapshot, prepareSnapshotForChapter } = require('../../../shared/snapshots.cjs');
 const archives = require('../../../shared/archives.cjs');
 const { initialRelationshipState } = require("../../../shared/runtime.cjs");
@@ -270,9 +271,6 @@ const updateRelationshipSettingsStatement = db.prepare(`
       updated_at = ?
   WHERE id = ?
 `);
-const deleteConversationStatement = db.prepare(
-  "DELETE FROM conversations WHERE id = ?",
-);
 const deleteRelationshipConversationsStatement = db.prepare(
   "DELETE FROM conversations WHERE relationship_id = ?",
 );
@@ -290,25 +288,6 @@ function validateSnapshot(snapshot) {
 
 function normalizedTitle(value, fallback) {
   return String(value || fallback).trim().slice(0, 80) || fallback;
-}
-
-function normalizedMode(value) {
-  const mode = value == null ? "free" : String(value).trim();
-  if (mode === "free" || mode === "story") return mode;
-  const error = new Error("聊天模式必须是 free 或 story");
-  error.status = 400;
-  throw error;
-}
-
-function normalizedGoal(value) {
-  return String(value || "").trim().slice(0, 500);
-}
-
-function normalizedGoalStatus(value) {
-  if (value === "active" || value === "achieved") return value;
-  const error = new Error("目标状态必须是 active 或 achieved");
-  error.status = 400;
-  throw error;
 }
 
 function normalizeConversation(row, includeSnapshot = false) {
@@ -695,40 +674,7 @@ function renameRelationship(id, title) {
 function updateRelationshipSettings(id, input = {}) {
   const relationship = getRelationship(id);
   if (!relationship) return null;
-  if (relationship.mode !== "story") {
-    const error = new Error("自由模式没有故事目标");
-    error.status = 409;
-    throw error;
-  }
-  const goalWasProvided = Object.prototype.hasOwnProperty.call(input, "goal");
-  const goal = goalWasProvided
-    ? normalizedGoal(input.goal)
-    : relationship.goal;
-  if (!goal) {
-    const error = new Error("故事目标不能为空");
-    error.status = 400;
-    throw error;
-  }
-  const goalChanged = goalWasProvided && goal !== relationship.goal;
-  let goalStatus = goalChanged ? "active" : relationship.goalStatus;
-  let goalAchievedAt = goalChanged ? null : relationship.goalAchievedAt;
-  let goalResolution = goalChanged ? "" : relationship.goalResolution;
-
-  if (Object.prototype.hasOwnProperty.call(input, "goalStatus")) {
-    goalStatus = normalizedGoalStatus(input.goalStatus);
-    if (goalStatus === "achieved") {
-      goalAchievedAt = relationship.goalAchievedAt || new Date().toISOString();
-      goalResolution = String(input.goalResolution || "").trim().slice(0, 500);
-      if (!goalResolution) {
-        const error = new Error("确认目标达成时需要提供判断依据");
-        error.status = 400;
-        throw error;
-      }
-    } else {
-      goalAchievedAt = null;
-      goalResolution = "";
-    }
-  }
+  const { goal, goalStatus, goalAchievedAt, goalResolution } = patchStoryGoal(relationship, input);
 
   updateRelationshipSettingsStatement.run(
     goal,
