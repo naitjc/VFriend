@@ -7,8 +7,8 @@ android {
         applicationId "com.naitjc.chatrp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 8
-        versionName "1.4.0"
+        versionCode 9
+        versionName "1.4.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -22,8 +22,8 @@ android {
             applicationIdSuffix ".preview"
             versionNameSuffix "-parallel"
             matchingFallbacks = ['debug']
-            resValue "string", "app_name", "Chat RP 新版"
-            resValue "string", "title_activity_main", "Chat RP 新版"
+            resValue "string", "app_name", "VFriend"
+            resValue "string", "title_activity_main", "VFriend"
         }
         release {
             minifyEnabled false

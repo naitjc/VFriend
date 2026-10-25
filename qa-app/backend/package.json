@@ -1,7 +1,7 @@
 {
-  "name": "backend",
+  "name": "vfriend-backend",
   "version": "1.0.0",
-  "description": "Backend for the Q&A app.",
+  "description": "Local backend for VFriend, a virtual companion app.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

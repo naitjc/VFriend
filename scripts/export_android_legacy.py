@@ -80,7 +80,7 @@ def main():
     with tempfile.TemporaryDirectory() as working:
         for source in target.iterdir():
             shutil.copy2(source, pathlib.Path(working) / source.name)
-        destination = target / f'Chat-RP-旧版完整备份-{stamp}.json'
+        destination = target / f'VFriend-旧版完整备份-{stamp}.json'
         count = export_database(pathlib.Path(working) / name, destination)
     print(f'已导出 {count} 个存档：{destination}')
     print('旧应用及原存档仍然保留。模型 API Key 不包含在备份中。')
@@ -88,7 +88,7 @@ def main():
         remote = f'/sdcard/Download/{destination.name}'
         run('push', str(destination), remote)
         print(f'已复制到手机：{remote}')
-    print('安装“Chat RP 新版”后，打开“更多 → 导入备份”选择此 JSON。')
+    print('安装“VFriend”后，打开“更多 → 导入备份”选择此 JSON。')
 
 
 if __name__ == '__main__':

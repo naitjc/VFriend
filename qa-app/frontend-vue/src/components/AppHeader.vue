@@ -369,7 +369,7 @@ const exportHistory = () => withArchiveAction(async () => {
 })
 const exportBackup = () => withArchiveAction(async () => {
   const backup = await chatStore.exportBackup()
-  const result = await saveTextFile(`Chat-RP_完整备份_${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup))
+  const result = await saveTextFile(`VFriend_完整备份_${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup))
   if (!result.cancelled) ElMessage.success('完整备份已导出')
   showMoreMenu.value = false
 })
@@ -379,7 +379,7 @@ const importBackup = () => withArchiveAction(async () => {
   if (text.error) throw new Error(text.error)
   let backup
   try { backup = JSON.parse(text) } catch { throw new Error('无法读取备份，请选择完整备份 JSON 文件') }
-  if (backup.format !== 'chat-rp-backup' || backup.version !== 1 || !Array.isArray(backup.relationships)) throw new Error('不是受支持的 Chat RP 完整备份')
+  if (backup.format !== 'chat-rp-backup' || backup.version !== 1 || !Array.isArray(backup.relationships)) throw new Error('不是受支持的 VFriend 完整备份')
   await ElMessageBox.confirm(`将新增 ${backup.relationships.length} 个存档副本，包含角色设定、关系、记忆和全部章节。`, '导入完整备份', { confirmButtonText: '导入副本', cancelButtonText: '取消' })
   const result = await chatStore.importBackup(backup)
   ElMessage.success(`已导入 ${result.importedCount} 个存档`)
@@ -479,6 +479,7 @@ const displayName = computed(() => {
 <template>
   <el-header class="app-header">
     <div class="header-left">
+      <span class="brand-wordmark" title="VFriend · 虚拟伙伴" aria-label="VFriend · 虚拟伙伴">VFriend<small v-if="!isMobile">虚拟伙伴</small></span>
       <el-select
         v-if="!isMobile"
         v-model="selectedCharacterId"
@@ -800,7 +801,7 @@ const displayName = computed(() => {
     </template>
   </el-dialog>
 
-  <el-drawer v-model="guideOpen" title="Chat RP 使用指南" :direction="isMobile ? 'btt' : 'rtl'" :size="isMobile ? '94dvh' : 'min(760px, 92vw)'" class="guide-drawer">
+  <el-drawer v-model="guideOpen" title="VFriend 使用指南" :direction="isMobile ? 'btt' : 'rtl'" :size="isMobile ? '94dvh' : 'min(760px, 92vw)'" class="guide-drawer">
     <div class="guide-layout">
       <nav v-if="!isMobile" class="guide-nav" aria-label="教程章节">
         <button v-for="(section, index) in guideSections" :key="section.title" type="button" :class="{ active: activeGuideSection === index }" @click="activeGuideSection = index">
@@ -844,6 +845,9 @@ const displayName = computed(() => {
   align-items: center;
   transition: var(--transition);
 }
+
+.brand-wordmark { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; padding-right: 12px; border-right: 1px solid var(--border-glass-strong); color: var(--text-accent); font-size: 18px; font-weight: 750; line-height: 1.1; letter-spacing: -0.4px; }
+.brand-wordmark small { font-size: 10px; font-weight: 500; letter-spacing: 2px; color: var(--text-secondary); }
 
 .header-left {
   display: flex;
@@ -1159,6 +1163,8 @@ const displayName = computed(() => {
     margin-bottom: 10px;
     border-radius: 16px;
   }
+
+  .brand-wordmark { font-size: 15px; padding-right: 8px; }
 
   .header-left {
     gap: 8px;

@@ -43,9 +43,9 @@ jobs:
           ./gradlew assembleDebug
 
       - name: Prepare release asset
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk "Chat-RP-${GITHUB_REF_NAME}.apk"
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk "VFriend-${GITHUB_REF_NAME}.apk"
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" "Chat-RP-$GITHUB_REF_NAME.apk" --generate-notes --title "Chat RP $GITHUB_REF_NAME"
+        run: gh release create "$GITHUB_REF_NAME" "VFriend-$GITHUB_REF_NAME.apk" --generate-notes --title "VFriend $GITHUB_REF_NAME"

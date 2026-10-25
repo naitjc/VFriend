@@ -1,6 +1,6 @@
 {
   "appId": "com.naitjc.chatrp",
-  "appName": "Chat RP",
+  "appName": "VFriend",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

@@ -1,6 +1,6 @@
-# Chat RP
+# VFriend
 
-基于 Vue、Express 与 SQLite 的本地沉浸式角色聊天应用。每个角色可以拥有多个互相独立的聊天存档，并在创建时选择聊天模式。
+**VFriend（Virtual Friend，虚拟伙伴）**，基于 Vue、Express 与 SQLite 的本地沉浸式角色聊天应用。每个角色可以拥有多个互相独立的聊天存档，并在创建时选择聊天模式。
 
 ## 核心能力
 
@@ -80,7 +80,7 @@ Android 与 Web 共用 Vue 界面和聊天状态，但通过运行平台选择�
 
 首次打开 Android 应用时，在“模型 API 设置”中填写 API 地址和 API Key。Android 版固定使用 `DeepSeek-V4-Flash`，无需填写模型名称。
 
-Android 调试版（v1.3.1，包含记忆、关系与界面更新）：[下载 APK](https://github.com/naitjc/chat/releases/download/v1.3.1/Chat-RP-v1.3.1.apk)
+旧版 Chat RP 调试包（v1.3.1，保留历史下载）：[下载 APK](https://github.com/naitjc/VFriend/releases/download/v1.3.1/Chat-RP-v1.3.1.apk)
 
 > 该安装包使用开发调试签名，适合个人安装测试。Android 可能提示来源未知，需要在系统设置中允许当前浏览器或文件管理器安装应用。
 
@@ -98,7 +98,7 @@ npm run android:apk
 qa-app/frontend-vue/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-该 APK 使用开发调试签名，适合直接安装测试；正式分发时应改用自己的 release keystore 签名。当前本地 Android 版本号为 `1.4.0`（versionCode `8`）。
+该 APK 使用开发调试签名，适合直接安装测试；正式分发时应改用自己的 release keystore 签名。当前本地 Android 版本号为 `1.4.1`（versionCode `9`）。
 
 ## 主要目录
 
@@ -126,8 +126,14 @@ qa-app/
 - Android 清单关闭普通系统备份；模型 API Key 不会写入源码、Web 存储或 APK 配置。
 - 删除存档不可恢复，界面会在执行前要求确认。
 
-### 本地 v1.4.0 与旧版签名兼容
+### Android 与旧版签名兼容
 
-现有 1.3.1 发布包与当前本地调试签名不同，不能直接覆盖安装。可以运行 `npm run android:parallel`，生成应用 ID 为 `com.naitjc.chatrp.preview` 的“Chat RP 新版”，与旧应用共存。输出在 `android/app/build/outputs/apk/parallel/app-parallel.apk`。
+现有 1.3.1 发布包与当前本地调试签名不同，不能直接覆盖安装。可以运行 `npm run android:parallel`，生成应用 ID 为 `com.naitjc.chatrp.preview` 的“VFriend”，与旧应用共存。输出在 `android/app/build/outputs/apk/parallel/app-parallel.apk`。
 
 旧版调试应用可以通过 `python3 scripts/export_android_legacy.py --push` 导出 SQLite 存档到完整备份 JSON，再在新版“导入备份”中恢复；使用前先结束手机上正在生成的回复，并连接已授权 USB 调试的手机。工具不卸载旧应用、不读取 API Key。ADB 迁移仍需真机验证。
+
+### VFriend 名称与兼容性
+
+从 v1.4.1 起，项目统一使用 **VFriend（虚拟伙伴）**。Web 页面、Android 桌面名称、使用指南、备份文件名和后续发布安装包均使用新名称。
+
+Android 应用 ID、SQLite 数据库名、模型设置存储键和备份格式标识沿用旧值，已有角色、聊天、模型配置及旧版 JSON 备份继续兼容。1.4.0 共存版可使用相同签名的 VFriend 共存版覆盖更新；此前 1.3.1 发布包的签名迁移说明仍然适用。

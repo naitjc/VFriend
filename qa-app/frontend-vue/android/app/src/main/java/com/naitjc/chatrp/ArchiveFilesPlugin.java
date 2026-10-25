@@ -22,7 +22,7 @@ public class ArchiveFilesPlugin extends Plugin {
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType(call.getString("mimeType", "application/json"));
-        intent.putExtra(Intent.EXTRA_TITLE, call.getString("name", "Chat-RP-backup.json"));
+        intent.putExtra(Intent.EXTRA_TITLE, call.getString("name", "VFriend-backup.json"));
         startActivityForResult(call, intent, "saveResult");
     }
 

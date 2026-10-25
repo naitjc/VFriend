@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Chat RP</string>
-    <string name="title_activity_main">Chat RP</string>
+    <string name="app_name">VFriend</string>
+    <string name="title_activity_main">VFriend</string>
     <string name="package_name">com.naitjc.chatrp</string>
     <string name="custom_url_scheme">com.naitjc.chatrp</string>
 </resources>

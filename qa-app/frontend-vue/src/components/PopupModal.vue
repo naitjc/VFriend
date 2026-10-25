@@ -23,12 +23,12 @@ const handleClose = () => {
         style="width: 260px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(124,131,253,0.2);"
         fit="contain"
       />
-      <h2 class="dialog-title">欢迎回来 ✨</h2>
+      <h2 class="dialog-title">欢迎来到 VFriend</h2>
       <p class="dialog-text">
-        虽然只是一个聊天机器人，但也不能做那些不好的事情噢！
+        陪你聊天、一起经历故事的虚拟伙伴。
       </p>
       <el-button type="primary" class="dialog-btn" @click="handleClose">
-        我知道了，开始聊天
+        开始聊天
       </el-button>
     </div>
   </el-dialog>
