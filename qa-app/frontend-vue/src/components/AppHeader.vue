@@ -479,7 +479,7 @@ const displayName = computed(() => {
 <template>
   <el-header class="app-header">
     <div class="header-left">
-      <span class="brand-wordmark" title="VFriend · 虚拟伙伴" aria-label="VFriend · 虚拟伙伴">VFriend<small v-if="!isMobile">虚拟伙伴</small></span>
+      <span class="brand-wordmark" title="VFriend" aria-label="VFriend">VFriend</span>
       <el-select
         v-if="!isMobile"
         v-model="selectedCharacterId"
@@ -847,7 +847,6 @@ const displayName = computed(() => {
 }
 
 .brand-wordmark { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; padding-right: 12px; border-right: 1px solid var(--border-glass-strong); color: var(--text-accent); font-size: 18px; font-weight: 750; line-height: 1.1; letter-spacing: -0.4px; }
-.brand-wordmark small { font-size: 10px; font-weight: 500; letter-spacing: 2px; color: var(--text-secondary); }
 
 .header-left {
   display: flex;
