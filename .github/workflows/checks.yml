@@ -1,0 +1,46 @@
+name: Project checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-and-domain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            qa-app/backend/package-lock.json
+            qa-app/frontend-vue/package-lock.json
+      - run: npm run setup
+      - run: npm run check
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: qa-app/frontend-vue/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm --prefix qa-app/frontend-vue ci
+      - run: npm --prefix qa-app/frontend-vue run android:sync
+      - run: ./gradlew assembleDebug assembleParallel
+        working-directory: qa-app/frontend-vue/android
