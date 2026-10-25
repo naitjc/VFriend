@@ -29,4 +29,4 @@ Application IDs (`com.naitjc.chatrp` and `.preview`), database names, legacy sto
 
 ## Brand assets
 
-The selected Conversation V source is `design/brand/icon.json`. `npm run icons` generates the SVG favicon, legacy launcher resources, adaptive foreground/background layers and Android 13 monochrome layers. See the brand README for regeneration and design provenance.
+The selected Companion V source is `design/brand/icon.json`. `npm run icons` generates the SVG favicon, legacy launcher resources, adaptive foreground/background layers and Android 13 monochrome layers. See the brand README for regeneration and design provenance.

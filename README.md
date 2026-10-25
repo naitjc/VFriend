@@ -1,6 +1,6 @@
 # VFriend
 
-<img src="design/brand/vfriend.svg" width="88" alt="VFriend Conversation V icon">
+<img src="design/brand/vfriend.svg" width="88" alt="VFriend Companion V icon">
 
 **VFriend（Virtual Friend，虚拟伙伴）**，基于 Vue、Express 与 SQLite 的本地沉浸式角色聊天应用。每个角色可以拥有多个互相独立的聊天存档，并在创建时选择聊天模式。
 
@@ -78,7 +78,7 @@ npm run android:apk
 qa-app/frontend-vue/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-该 APK 使用开发调试签名，适合直接安装测试；正式分发时应改用自己的 release keystore 签名。当前本地 Android 版本号为 `1.5.0`（versionCode `10`）。
+该 APK 使用开发调试签名，适合直接安装测试；正式分发时应改用自己的 release keystore 签名。当前本地 Android 版本号为 `1.5.1`（versionCode `11`）。
 
 ## 主要目录
 

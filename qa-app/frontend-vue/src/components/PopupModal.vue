@@ -25,7 +25,7 @@ const handleClose = () => {
       />
       <h2 class="dialog-title">欢迎来到 VFriend</h2>
       <p class="dialog-text">
-        陪你聊天、一起经历故事的虚拟伙伴。
+        虽然只是一个聊天机器人，但也不能做那些不好的事情噢！
       </p>
       <el-button type="primary" class="dialog-btn" @click="handleClose">
         开始聊天

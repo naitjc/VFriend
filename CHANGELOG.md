@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.1 — 2026-10-25
+
+- Adopt Companion V after the user selected the two-companion concept. Match the Web icon, adaptive/legacy Android launchers, monochrome layer and splash palette with one vector source.
+- Preserve the four proposals and previous Conversation V reference; add an icon preview page.
+- Restore the original welcome dialog reminder.
+- Android versionCode is 11; application IDs and signing configuration are unchanged.
+
 ## 1.5.0 — 2026-10-25
 
 - Unify Web and Android chat orchestration, chapter/goal advisers, summaries, model validation and chapter snapshot rules.

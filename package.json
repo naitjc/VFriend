@@ -1,7 +1,7 @@
 {
   "name": "vfriend-project",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "VFriend Web and Android development entry points",
   "engines": {
     "node": ">=22.5.0"

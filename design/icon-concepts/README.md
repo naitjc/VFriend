@@ -1,6 +1,6 @@
 # VFriend icon concepts
 
-原创探索稿。用户已选择 Conversation V；正式 Web 与 Android 资源由 design/brand/icon.json 的平滑矢量轮廓生成。采用内置 imagegen 生成；完整提示词见 [prompts.md](prompts.md)。
+原创探索稿。用户已改选 Companion V；正式 Web 与 Android 资源由 design/brand/icon.json 的平滑矢量轮廓生成。采用内置 imagegen 生成；完整提示词见 [prompts.md](prompts.md)。
 
 | Companion V · 双伙伴 | Conversation V · 对话 |
 | --- | --- |
@@ -8,7 +8,7 @@
 | Friendly Face · 笑脸 | Quiet V · 字母标识 |
 | ![Friendly Face](friendly-face.png) | ![Quiet V](quiet-v.png) |
 
-已选定 **Conversation V**。正式版保留紫色背景、对话气泡和负形 V，改为干净的矢量轮廓，保证 Web、Android 彩色及单色版本使用一致的几何形状。其余三款保留作为探索过程。生成原稿与正式矢量的关系见 [brand/README.md](../brand/README.md)。
+当前已选定 **Companion V（双伙伴 V）**。正式版保留两个伙伴组成的 V、浅紫色背景和柔和折面，生成同一套 Web、Android 彩色及单色矢量资源。Conversation V 为先前采用的方向，和其余探索稿一并保留。正式资源见 [brand/README.md](../brand/README.md)。
 
 ## 检索参考（2026-10-25）
 
